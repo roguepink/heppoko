@@ -4,15 +4,15 @@
 var BATTLE = (function () {
   var CONST = {
     DMG_SCALE_HERO: 20, DMG_SCALE_COMP: 70, HERO_BASE: { hp: 100, atk: 3, def: 2, spd: 5, luck: 5 },
-    BOSS_ATK: { single: 1000, all: 450, big: 2600 }, BOSS_HEAL_RATE: 0.08, BOSS_HEAL_TIMES: 2,
-    GUARD_MUL: 0.3, GUARD_STANCE: [1, 0.2, 0.1, 0.07, 0.05], HERO_TARGET_P: 0.5, REPEAT_COMBO_MUL: 0.25,
+    BOSS_ATK: { single: 1000, all: 450, big: 2700 }, BOSS_HEAL_RATE: 0.08, BOSS_HEAL_TIMES: 2,
+    GUARD_MUL: 0.3, GUARD_STANCE: [0.35, 0.2, 0.1, 0.07, 0.05], HERO_TARGET_P: 0.5, REPEAT_COMBO_MUL: 0.25,
     ROLE_MUL: { attack: 1.0, guard: 0.6, heal: 0.4, support: 0.6, weird: 1.0 }, ALL_COMP_MUL: 1.0, COMP_DEF_BONUS: 0
   };
   var PHASES = [
     { until: 0.70, name: 'よゆう', atk: 1.0, w: { normal: 45, all: 20, charge: 0, heal: 0, mood: 35 }, chargeGap: 99, moodP: 0.6, moods: ['boast', 'taunt', 'laugh', 'sleepy'] },
     { until: 0.40, name: 'いらいら', atk: 1.2, w: { normal: 35, all: 25, charge: 20, heal: 0, mood: 20 }, chargeGap: 3, moodP: 0.5, moods: ['angry', 'boast', 'sleepy', 'taunt', 'hungry'], enterMood: 'angry' },
     { until: 0.15, name: 'あせり', atk: 1.5, w: { normal: 30, all: 25, charge: 25, heal: 10, mood: 10 }, chargeGap: 3, moodP: 0.5, moods: ['cry', 'hungry', 'lonely', 'angry', 'laugh'], enterMood: 'cry' },
-    { until: 0.00, name: 'ほんき', atk: 3.0, w: { normal: 25, all: 35, charge: 40, heal: 0, mood: 0 }, chargeGap: 2, moodP: 0.3, moods: ['angry'], enterMood: 'charge' }
+    { until: 0.00, name: 'ほんき', atk: 2.7, w: { normal: 25, all: 35, charge: 40, heal: 0, mood: 0 }, chargeGap: 2, moodP: 0.3, moods: ['angry'], enterMood: 'charge' }
   ];
   var MOODS = {
     normal: { name: 'ふつう', emoji: '😈', atk: 1.0, taken: 1.0, skip: 0, len: 0, line: '' },
@@ -142,7 +142,7 @@ var BATTLE = (function () {
     var toks = str.split(' '), i = 0;
     while (i < toks.length) { var t = toks[i]; if (t === 'mood' || t === 'dmg' || t === 'batk' || t === 'hheal' || t === 'pheal' || t === 'bheal' || t === 'self' || t === 'buff' || t === 'vuln') { applyEffect(s, t + ' ' + toks[i + 1], events, cmdId, rng); i += 2; } else { applyEffect(s, t, events, cmdId, rng); i++; } }
   }
-  function setMood(s, m, events) { if (!MOODS[m]) return; s.boss.mood = m; s.boss.moodLeft = MOODS[m].len; if (m === 'charge') s.boss.chargeTurn = s.turn; ev(events, 'mood', { mood: m, text: MOODS[m].line }); }
+  function setMood(s, m, events) { if (!MOODS[m]) return; s.boss.mood = m; s.boss.moodLeft = MOODS[m].len; if (m === 'charge') s.boss.chargeTurn = s.turn; s.moodSeen = s.moodSeen || {}; s.moodSeen[m] = (s.moodSeen[m] || 0) + 1; ev(events, 'mood', { mood: m, text: MOODS[m].line }); }
   function healHero(s, events, a) { var before = s.hero.hp; s.hero.hp = Math.min(s.hero.maxHp, s.hero.hp + a); ev(events, 'heal', { target: 'hero', amount: s.hero.hp - before }); }
 
   /* ① へっぽこのコマンド */
@@ -163,12 +163,13 @@ var BATTLE = (function () {
       var tbl = EFFECTS[cmd.id]; if (!tbl) { ev(events, 'text', { text: 'なにも おこらなかった' }); return; }
       if (cmd.id === 'mama') { if (s.hero.mamaUsed) { ev(events, 'text', { text: 'ママは もう 来てくれない…' }); return; } s.hero.mamaUsed = true; }
       ev(events, 'text', { text: cmd.text || ('へっぽこは ' + cmd.name + '!'), who: 'hero', cmd: cmd.id });
-      var m = s.boss.mood, list = tbl[m];
+      var m = s.boss.mood, list = tbl[m], combosBefore = s.combos;
       if (!list) { if ((m === 'asleep') && WAKE[cmd.id]) list = ['clear', 'text 大魔王が 起きてしまった!']; else list = tbl['*']; }
       // text は最後に出したいので並べ替え(効果→セリフ)
       var fx = list.filter(function (c) { return c.indexOf('text ') !== 0; }), tx = list.filter(function (c) { return c.indexOf('text ') === 0; });
       tx.forEach(function (c) { applyEffect(s, c, events, cmd.id, rng); });
       fx.forEach(function (c) { applyEffect(s, c, events, cmd.id, rng); });
+      if (BEST[m] && s.combos === combosBefore) s.missedIn = m; else if (s.combos > combosBefore) s.missedIn = null;
       return;
     }
   }
