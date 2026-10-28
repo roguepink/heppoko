@@ -32,8 +32,8 @@ function removeItem(id) { var i = P.items.indexOf(id); if (i >= 0) P.items.splic
 var HUD = (function () {
   var node = el('div', 'hidden'); node.id = 'hud';
   var money = el('span', 'money', ''), place = el('span', 'place', ''), diff = el('span', 'mdiff', '');
-  var gear = btn('⚙️', 'small lav', function () { openSettings(); }); gear.style.cssText = 'min-height:40px;width:44px;padding:0;font-size:18px;box-shadow:none;border-width:2px';
-  var right = el('div', '', ''); right.style.cssText = 'display:flex;align-items:center;gap:8px'; right.appendChild(place); right.appendChild(gear);
+  var gear = btn('⚙️', 'small lav', function () { openSettings(); }); gear.style.cssText = 'flex:none;min-height:40px;width:44px;padding:0;font-size:18px;box-shadow:none;border-width:2px';
+  var right = el('div', '', ''); right.style.cssText = 'display:flex;align-items:center;gap:8px;min-width:0'; right.appendChild(place); right.appendChild(gear);
   node.appendChild(money); node.appendChild(right); node.appendChild(diff); ui.appendChild(node);
   var shown = 0, target = 0, anim = null;
   function update(delta) {

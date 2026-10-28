@@ -9,7 +9,7 @@ const FILES = ['./', 'index.html', 'install.js', 'manifest.webmanifest', 'icon-1
   'shots/1.jpg', 'shots/2.jpg', 'shots/3.jpg', 'shots/4.jpg', 'shots/5.jpg'];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(VERSION).then((c) => Promise.all(FILES.map((f) => c.add(f).catch(() => {})))).then(() => self.skipWaiting())); // 1つ(例: まだ無い紹介画像)が取れなくても、ほかは覚える
 });
 
 self.addEventListener('activate', (e) => {

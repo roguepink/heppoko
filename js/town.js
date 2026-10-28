@@ -43,6 +43,7 @@ var TOWN = (function () {
     if (p) { // 隣まで歩いて話す
       if (Math.abs(p.x - hero.x) + Math.abs(p.y - hero.y) === 1) { face(p.x, p.y); talkTo(p); return; }
       var best = null, bd = 1e9; [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(function (d) { var x = p.x + d[0], y = p.y + d[1]; if (!passable(x, y) || personAt(x, y) || PASS[tileAt(x, y)] >= 2) return; var pt = findPath(hero.x, hero.y, x, y, blockedMap()); if (pt && pt.length < bd) { bd = pt.length; best = { x: x, y: y }; } });
+      if (!best) [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(function (d) { var x = p.x + d[0], y = p.y + d[1]; if (!passable(x, y) || PASS[tileAt(x, y)] >= 2) return; var pt = findPath(hero.x, hero.y, x, y, null); if (pt && pt.length < bd) { bd = pt.length; best = { x: x, y: y }; } }); // 人でふさがれて行けないときは、人と入れかわりながら進む
       if (best) walkTo(best.x, best.y, function () { face(p.x, p.y); talkTo(p); }); else { hero.q = '❓'; hero.qt = 0.7; }
       return;
     }
@@ -77,12 +78,11 @@ var TOWN = (function () {
     if (held) stepDir(held[0], held[1]);
     if (!hero.moving && hero.path.length) {
       var n = hero.path[0];
-      if (personAt(n.x, n.y)) { // 行く先に人が立っていた: まわり道をさがし、なければ止まる
-        var goal = hero.path[hero.path.length - 1], re = goal ? findPath(hero.x, hero.y, goal.x, goal.y, blockedMap()) : null;
-        if (re && re.length) hero.path = re;
-        else { hero.path = []; target = null; if (hero.then) { var f = hero.then; hero.then = null; f(); } else { hero.q = '❓'; hero.qt = 0.7; } }
+      var bp = personAt(n.x, n.y);
+      if (bp) { // 行く先に人が立っていた(細い道をふさぐ人がいる): その人と場所を入れかわって、先へ進む。詰まらない
+        bp.fx = bp.x; bp.fy = bp.y; bp.x = hero.x; bp.y = hero.y; bp.t = 1; bp.wait = rnd(1, 3);
       }
-      else { hero.path.shift(); face(n.x, n.y); hero.fx = hero.x; hero.fy = hero.y; hero.x = n.x; hero.y = n.y; hero.moving = true; hero.t = 0; justIn = false;
+      { hero.path.shift(); face(n.x, n.y); hero.fx = hero.x; hero.fy = hero.y; hero.x = n.x; hero.y = n.y; hero.moving = true; hero.t = 0; justIn = false;
         trail.unshift({ x: hero.fx, y: hero.fy }); if (trail.length > 14) trail.pop(); hero.step++; if (hero.step % 4 === 0) AUDIO.sfx('step'); }
     }
     if (hero.moving) {

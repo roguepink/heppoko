@@ -43,8 +43,8 @@
   .xbtn { position:absolute; right:8px; top:6px; width:52px; height:52px; min-height:52px; padding:0; font-size:24px; background:var(--cream); border-radius:50%; z-index:3; }
   /* 上の帯 */
   #hud { position:absolute; left:0; top:0; width:390px; height:52px; background:rgba(27,20,48,.92); display:flex; align-items:center; justify-content:space-between; padding:0 10px; font-weight:900; }
-  #hud .money { font-size:22px; color:var(--sun); font-variant-numeric:tabular-nums; }
-  #hud .place { font-size:16px; color:#fff; }
+  #hud .money { font-size:22px; color:var(--sun); font-variant-numeric:tabular-nums; white-space:nowrap; flex:none; }
+  #hud .place { font-size:15px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:128px; } /* 長い店の名前でお金が2行にならない */
   #hud .mdiff { position:absolute; left:14px; top:50px; font-size:18px; font-weight:900; text-shadow:0 2px 0 var(--ink); transition:opacity .3s, transform 1.1s; pointer-events:none; }
   /* 下の帯(町) */
   #bottom { position:absolute; left:0; top:628px; width:390px; height:152px; background:rgba(27,20,48,.92); padding:12px 8px 0; }

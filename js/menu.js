@@ -201,8 +201,9 @@ var RECRUIT = (function () {
     var before = c.talk.before || [];
     switch (h.type) {
       case 'free': say(who, before.slice(0, 1).concat([h.text]), function () { ask(who, '仲間に なってもらう?', [{ label: 'おねがい!', cls: 'leaf', fn: function () { join(c, then); } }, { label: 'やめておく', cls: 'gray', fn: function () { then && then(false); } }]); }); break;
-      case 'pay': say(who, before.slice(0, 1).concat([h.text]), function () {
-        ask(who, fmtG(h.price) + ' はらう?(のこり ' + fmtG(P.money - h.price) + ')', [{ label: '💰 はらう', cls: 'orange', disabled: P.money < h.price, fn: function () { if (!pay(h.price)) return; AUDIO.sfx('coin'); join(c, then); } }, { label: P.money < h.price ? 'お金が たりない…' : 'やめておく', cls: 'gray', fn: function () { if (P.money < h.price) say(who, [c.talk.no]); then && then(false); } }]); }); break;
+      case 'pay': if (P.party.length >= 10) { join(c, then); break; } // 10組いっぱいのときは お金を取らずに 案内だけ
+        say(who, before.slice(0, 1).concat([h.text]), function () {
+        ask(who, fmtG(h.price) + ' はらう?' + (P.money >= h.price ? '(のこり ' + fmtG(P.money - h.price) + ')' : '(いまの お金 ' + fmtG(P.money) + ')'), [{ label: '💰 はらう', cls: 'orange', disabled: P.money < h.price, fn: function () { if (!pay(h.price)) return; AUDIO.sfx('coin'); join(c, then); } }, { label: P.money < h.price ? 'お金が たりない…' : 'やめておく', cls: 'gray', fn: function () { if (P.money < h.price) say(who, [c.talk.no]); then && then(false); } }]); }); break;
       case 'riddle': case 'quest': say(who, before.slice(0, 1).concat([h.text]), function () {
         var ch = (h.choices || []).map(function (op) { return { label: op, cls: 'lav', fn: function () { if (op === h.answer) { AUDIO.sfx('ok'); join(c, then); } else { AUDIO.sfx('cancel'); say(who, [c.talk.no], function () { then && then(false); }); } } }; });
         ch.push({ label: 'あとで', cls: 'gray', fn: function () { then && then(false); } });
