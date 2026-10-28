@@ -27,7 +27,7 @@ var TOWN = (function () {
     row.appendChild(btn('<span class="e">💾</span>セーブ', 'lav', function () { toast(saveGame() ? '✅ セーブした' : '❌ 保存できなかった'); }));
     bottom.appendChild(row); bottom.appendChild(el('div', 'stat', '')); bottom.appendChild(el('div', 'tip', '')); ui.appendChild(bottom);
   }
-  function refreshStat() { if (!bottom) return; var st = heroStats(); bottom.querySelector('.stat').textContent = '⚔️ 攻 ' + st.atk + '  🛡️ 守 ' + st.def + '  ❤️ HP ' + st.hp + '   👥 ' + P.party.length + '/10組'; }
+  function refreshStat() { if (!bottom) return; var st = heroStats(); bottom.querySelector('.stat').textContent = '⚔️攻 ' + st.atk + '  🛡️守 ' + st.def + '  ❤️HP ' + st.hp + '  👥 ' + P.party.length + '/10組'; }
   function setTip(s) { if (bottom) bottom.querySelector('.tip').textContent = '💬 ' + s; }
 
   /* 目標までの道 */
@@ -171,5 +171,5 @@ var TOWN = (function () {
     },
     refresh: function () { refreshStat(); buildPeople(); }
   };
-  return { hero: hero, refresh: function () { refreshStat(); buildPeople(); } };
+  return { hero: hero, refresh: function () { refreshStat(); buildPeople(); }, people: function () { return people; } };
 })();

@@ -42,7 +42,7 @@ var HUD = (function () {
       setTimeout(function () { diff.style.opacity = '0'; diff.style.transform = 'translateY(-20px)'; }, 900); }
     if (anim) clearInterval(anim); var start = shown, t0 = Date.now();
     anim = setInterval(function () { var k = Math.min(1, (Date.now() - t0) / 500); shown = Math.round(lerp(start, target, k)); money.textContent = '💰 ' + fmtG(shown); if (k >= 1) { clearInterval(anim); anim = null; } }, 30);
-    if (!delta) { shown = target; money.textContent = '💰 ' + fmtG(shown); }
+    if (!delta) { clearInterval(anim); anim = null; shown = target; money.textContent = '💰 ' + fmtG(shown); } // 差分なし = すぐ表示(0.5 秒ぐるぐるしない)
   }
   return { node: node, update: update, setPlace: function (s) { place.textContent = s; }, show: function () { show(node); update(); }, hide: function () { hide(node); } };
 })();

@@ -41,6 +41,7 @@ function findPath(sx, sy, tx, ty, blocked) {
     var best = null, bd = 1e9;
     for (var yy = 0; yy < MAPH; yy++) for (var xx = 0; xx < MAPW; xx++) {
       if (!passable(xx, yy) || PASS[tileAt(xx, yy)] >= 2) continue; // 扉・出口には「寄せ」で入らない(壁をタップしただけで店に入ってしまうのを防ぐ)
+      if (blocked && blocked[xx + ',' + yy]) continue;              // 人が立っている所にも寄せない(何も起きなくなる)
       var d = Math.abs(xx - tx) + Math.abs(yy - ty); if (d > 2) continue;
       var dd = d * 100 + Math.abs(xx - sx) + Math.abs(yy - sy);
       if (dd < bd) { bd = dd; best = { x: xx, y: yy }; }
