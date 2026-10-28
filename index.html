@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1b2a4a">
+<title>勇者へっぽこの小さな冒険</title>
+<meta name="description" content="隣町に大魔王が現れた!お金持ちの子・へっぽこが、お金の力で武器と仲間をそろえて、ただ一度の大決戦へ。笑って泣ける小さなRPG。">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="へっぽこ">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta property="og:type" content="website">
+<meta property="og:title" content="勇者へっぽこの小さな冒険">
+<meta property="og:description" content="隣町に大魔王が現れた!お金持ちの子・へっぽこが、お金の力で武器と仲間をそろえて、ただ一度の大決戦へ。笑って泣ける小さなRPG。">
+<meta property="og:image" content="https://roguepink.github.io/heppoko/ogp.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1b2a4a; color: #fff;
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", "Noto Sans JP", system-ui, sans-serif; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
+  .overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px; text-align: center; padding: env(safe-area-inset-top) 24px env(safe-area-inset-bottom); background: rgba(10, 6, 24, .72); }
+  .overlay.hidden { display: none; }
+  h1 { margin: 0; font-size: clamp(28px, 8vw, 48px); font-weight: 900; line-height: 1.25; }
+  p { margin: 0; line-height: 1.7; }
+  button { font: inherit; font-weight: 800; font-size: 20px; padding: 14px 36px; border: 3px solid #1b1430; border-radius: 999px;
+    background: #ffe066; color: #1b1430; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  #hud { position: fixed; top: calc(env(safe-area-inset-top) + 10px); left: 0; right: 0; display: flex; justify-content: space-between;
+    padding: 0 16px; font-weight: 800; font-size: 18px; pointer-events: none; text-shadow: 0 2px 0 #1b1430; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud"><span id="score">0</span><span id="best"></span></div>
+<div id="title" class="overlay">
+  <h1>勇者へっぽこの小さな冒険</h1>
+  <p>隣町に大魔王が現れた!お金持ちの子・へっぽこが、お金の力で武器と仲間をそろえて、ただ一度の大決戦へ。笑って泣ける小さなRPG。</p>
+  <button id="btnPlay" type="button">あそぶ</button>
+</div>
+<div id="over" class="overlay hidden">
+  <h1 id="overText">おしまい</h1>
+  <p id="overScore"></p>
+  <button id="btnAgain" type="button">もういっかい</button>
+</div>
+<script>
+'use strict';
+/* ★ これは「ひな型」。ゲームの中身(update / draw / 入力)を ここに作りこむ。
+   守ること: 論理サイズを固定して拡縮・タップ操作・最初のタップで開始・ポーズ(blur)・ハイスコア(localStorage)・壊れても固まらない */
+var CONFIG = { W: 360, H: 640, DT: 1 / 60, BEST_KEY: 'heppoko-best' };
+var cv = document.getElementById('game'), ctx = cv.getContext('2d');
+var G = { state: 'title', score: 0, best: 0, t: 0, px: CONFIG.W / 2, paused: false };
+try { G.best = +localStorage.getItem(CONFIG.BEST_KEY) || 0; } catch (e) {}
+document.getElementById('best').textContent = G.best ? 'ベスト ' + G.best : '';
+
+function resize() {
+  var dpr = Math.min(window.devicePixelRatio || 1, 3);
+  cv.width = Math.round(innerWidth * dpr); cv.height = Math.round(innerHeight * dpr);
+  var s = Math.min(cv.width / CONFIG.W, cv.height / CONFIG.H);
+  ctx.setTransform(s, 0, 0, s, (cv.width - CONFIG.W * s) / 2, (cv.height - CONFIG.H * s) / 2);
+}
+addEventListener('resize', resize); resize();
+
+function toLogical(ev) {
+  var r = cv.getBoundingClientRect(), s = Math.min(r.width / CONFIG.W, r.height / CONFIG.H);
+  return { x: (ev.clientX - r.left - (r.width - CONFIG.W * s) / 2) / s, y: (ev.clientY - r.top - (r.height - CONFIG.H * s) / 2) / s };
+}
+cv.addEventListener('pointerdown', function (ev) { if (G.state === 'play') G.px = toLogical(ev).x; });
+cv.addEventListener('pointermove', function (ev) { if (G.state === 'play' && ev.buttons) G.px = toLogical(ev).x; });
+addEventListener('keydown', function (ev) { if (ev.key === 'ArrowLeft') G.px -= 20; if (ev.key === 'ArrowRight') G.px += 20; });
+
+function start(ev) {
+  G.state = 'play'; G.score = 0; G.t = 0; G.px = CONFIG.W / 2;
+  document.getElementById('title').classList.add('hidden'); document.getElementById('over').classList.add('hidden');
+  // iPhone / Android で最初のタップのあとに全画面にする(失敗してもそのまま遊べる)。#play の自動開始では やらない
+  if (ev && ev.isTrusted) try {
+    var el = document.documentElement, fs = el.requestFullscreen || el.webkitRequestFullscreen;
+    var pr = fs && fs.call(el);
+    if (pr && pr.catch) pr.catch(function () {});   // 断られても(自動確認のときなど)エラーにしない
+  } catch (e) {}
+}
+function finish() {
+  G.state = 'over';
+  if (G.score > G.best) { G.best = G.score; try { localStorage.setItem(CONFIG.BEST_KEY, String(G.best)); } catch (e) {} }
+  document.getElementById('overScore').textContent = 'スコア ' + G.score + (G.best ? ' / ベスト ' + G.best : '');
+  document.getElementById('over').classList.remove('hidden');
+}
+document.getElementById('btnPlay').addEventListener('click', start);
+document.getElementById('btnAgain').addEventListener('click', start);
+document.addEventListener('visibilitychange', function () { if (document.hidden) G.paused = true; else G.paused = false; });
+
+function update(dt) {
+  G.t += dt; G.score = Math.floor(G.t * 10);
+  G.px = Math.max(20, Math.min(CONFIG.W - 20, G.px));
+  if (G.t > 15) finish();                       // ← ひな型: 15秒で おしまい。ここに ゲームの勝ち負けを書く
+  document.getElementById('score').textContent = G.score;
+}
+function draw() {
+  ctx.fillStyle = '#1b2a4a'; ctx.fillRect(-1000, -1000, 3000, 3000);
+  ctx.fillStyle = '#ffe066'; ctx.beginPath(); ctx.arc(G.px, CONFIG.H - 120, 20, 0, 6.283); ctx.fill();   // ← ひな型の 丸
+}
+
+var last = 0, acc = 0;
+function loop(now) {
+  requestAnimationFrame(loop);
+  try {
+    var dt = Math.min((now - last) / 1000, 0.05); last = now;
+    if (G.state === 'play' && !G.paused) { acc += dt; while (acc >= CONFIG.DT) { update(CONFIG.DT); acc -= CONFIG.DT; } }
+    draw();
+  } catch (e) { console.error(e); }             // 1回の失敗で 全体が止まらないように
+}
+requestAnimationFrame(function (t) { last = t; loop(t); });
+// 確認用: アドレスのうしろに #play をつけると、タイトルを飛ばして すぐ始まる(スクショ・自動確認で使う)
+if (location.hash === '#play') start();
+
+// LINE の中で開いたときだけ、1回だけ案内する(LINE の中は画面が小さく、ホーム画面にも入れられない)
+(function () {
+  var seenKey = 'heppoko-line-tip', seen = false;
+  try { seen = localStorage.getItem(seenKey) === '1'; } catch (e) {}
+  var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  if (!/\bLine\//i.test(navigator.userAgent) || standalone || seen) return;
+  var bar = document.createElement('div');
+  bar.style.cssText = 'position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:99999;background:#fffaf0;color:#1b1430;border:3px solid #1b1430;border-radius:14px;padding:10px 40px 10px 12px;font:700 13px/1.5 system-ui,sans-serif';
+  bar.textContent = 'LINEの中だと画面が小さめです。右下の「…」(または右上の︙)から「ブラウザで開く」を選ぶと、大きく遊べて、ホーム画面にも入れられます。';
+  var x = document.createElement('button'); x.type = 'button'; x.setAttribute('aria-label', 'とじる'); x.textContent = '×';
+  x.style.cssText = 'position:absolute;top:4px;right:6px;width:32px;height:32px;border:0;background:none;font:900 20px/1 system-ui;color:#1b1430;cursor:pointer';
+  x.addEventListener('click', function () { try { localStorage.setItem(seenKey, '1'); } catch (e) {} bar.remove(); });
+  bar.appendChild(x); addEventListener('load', function () { document.body.appendChild(bar); });
+})();
+
+// ホーム画面に入れられる(アプリのように開く)ための登録。file:// や 登録できない所では 何もしない
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+}
+</script>
+<script>
+  // はじめの画面(Google Play 風: インストール / このまま遊ぶ)。install.js が出す。ホーム画面から開いたときは出ない
+  window.INSTALL_GATE = { id: 'heppoko', name: '勇者へっぽこの小さな冒険', icon: 'icon-192.png', tagline: '', desc: '隣町に大魔王が現れた!お金持ちの子・へっぽこが、お金の力で武器と仲間をそろえて、ただ一度の大決戦へ。笑って泣ける小さなRPG。',
+    points: [], shots: [], badges: ['無料', '広告なし', '登録なし'] };
+</script>
+<script src="install.js"></script>
+</body>
+</html>
