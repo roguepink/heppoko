@@ -316,7 +316,8 @@ var BATTLEUI = (function () {
   /* ---------- 一覧(グリッド) ---------- */
   function gridButton(emoji, name, sub, color, desc, onPick) {
     var b = el('button'); b.type = 'button';
-    b.innerHTML = '<span class="e">' + emoji + '</span><span class="nm" style="flex:1;line-height:1.2">' + esc(name) + (sub ? '<small style="display:block;font-size:13px;font-weight:800;opacity:.85">' + esc(sub) + '</small>' : '') + '</span>';
+    var nmSize = name.length >= 9 ? 13 : name.length >= 7 ? 14 : 16; // 長い名前は小さく(2 行になって上下が切れないように)
+    b.innerHTML = '<span class="e">' + emoji + '</span><span class="nm" style="flex:1;line-height:1.15;font-size:' + nmSize + 'px;min-width:0">' + esc(name) + (sub ? '<small style="display:block;font-size:12px;font-weight:800;opacity:.85">' + esc(sub) + '</small>' : '') + '</span>';
     b.style.background = color;
     var timer = null, lp = false, sx = 0, sy = 0;
     b.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); lp = false; sx = ev.clientX; sy = ev.clientY; clearTimeout(timer); timer = setTimeout(function () { lp = true; showBubble(desc); }, 400); });

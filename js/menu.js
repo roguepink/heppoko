@@ -28,7 +28,7 @@ function shopScene(shopId) {
       var sel = null, descEl = null;
       function refresh() { var st = heroStats(); info.innerHTML = '<span>' + sh.items.length + ' 品</span><span>いま: 攻 ' + st.atk + ' 守 ' + st.def + ' HP ' + st.hp + '</span>'; }
       function build() {
-        list.innerHTML = ''; refresh();
+        list.innerHTML = ''; refresh(); sel = null; descEl = null; buy.disabled = true; buy.textContent = 'えらんでね'; // 買ったあと、もう一度「かう」で同じ物を二重に買わない
         sh.items.map(function (id) { return ITEMS[id]; }).filter(Boolean).sort(function (a, b) { return a.price - b.price; }).forEach(function (it) {
           var owned = hasItem(it.id), r = itemRow(it, owned ? { text: 'もってる' } : { text: fmtG(it.price), no: it.price > P.money }, function (row) {
             list.querySelectorAll('.row-item').forEach(function (x) { x.classList.remove('sel'); }); if (descEl) descEl.remove();
@@ -39,6 +39,7 @@ function shopScene(shopId) {
       }
       var buy = btn('えらんでね', 'orange', function () {
         if (!sel) return; var it = sel;
+        if (hasItem(it.id)) { buy.disabled = true; buy.textContent = 'もってる'; return; }
         if (it.price > P.money) { say({ name: owner.name, emoji: owner.emoji }, [sh.talk.poor]); return; }
         confirm(it.look.emoji + ' ' + it.name + ' を ' + fmtG(it.price) + ' で かう?\n(のこり ' + fmtG(P.money - it.price) + ')', 'かう', 'やめる', function (ok) {
           if (!ok) return; pay(it.price); P.items.push(it.id); AUDIO.sfx('buy'); autosave();
@@ -208,7 +209,7 @@ var RECRUIT = (function () {
         ask(who, h.question || h.text, ch); }); break;
       case 'favor': {
         var f = FAVOR[c.id] || {}; var done = f.item ? hasItem(f.item) : (f.check ? f.check() : true);
-        if (done) { if (f.item) { removeItem(f.item); say(who, ['それ! それが ほしかった!'], function () { join(c, then); }); } else join(c, then); }
+        if (done) { if (f.item && P.party.length < 10) { removeItem(f.item); say(who, ['それ! それが ほしかった!'], function () { join(c, then); }); } else join(c, then); } // 10組いっぱいのときは 品物を渡さない(join が「はずしたら来るよ」と言う)
         else { var first = !(P.flags['favor_' + c.id]); P.flags['favor_' + c.id] = true; if (f.start) f.start();
           var ls = first ? before.slice(0, 1).concat([h.text]) : [f.hint ? (f.hint() || h.text) : h.text]; say(who, ls, function () { then && then(false); }); }
         break; }

@@ -33,6 +33,7 @@ var TOWN = (function () {
   /* 目標までの道 */
   function walkTo(tx, ty, then) {
     var path = findPath(hero.x, hero.y, tx, ty, blockedMap());
+    if (!path) path = findPath(hero.x, hero.y, tx, ty, null); // 人に囲まれて道がないときは、人を無視した道で行ける所まで歩く(ぶつかったら止まる)
     if (!path) { hero.q = '❓'; hero.qt = 0.7; return false; }
     hero.path = path; hero.then = then || null; target = path.length ? path[path.length - 1] : null; return true;
   }
@@ -76,7 +77,11 @@ var TOWN = (function () {
     if (held) stepDir(held[0], held[1]);
     if (!hero.moving && hero.path.length) {
       var n = hero.path[0];
-      if (personAt(n.x, n.y)) { hero.path = []; target = null; if (hero.then) { var f = hero.then; hero.then = null; f(); } }
+      if (personAt(n.x, n.y)) { // 行く先に人が立っていた: まわり道をさがし、なければ止まる
+        var goal = hero.path[hero.path.length - 1], re = goal ? findPath(hero.x, hero.y, goal.x, goal.y, blockedMap()) : null;
+        if (re && re.length) hero.path = re;
+        else { hero.path = []; target = null; if (hero.then) { var f = hero.then; hero.then = null; f(); } else { hero.q = '❓'; hero.qt = 0.7; } }
+      }
       else { hero.path.shift(); face(n.x, n.y); hero.fx = hero.x; hero.fy = hero.y; hero.x = n.x; hero.y = n.y; hero.moving = true; hero.t = 0; justIn = false;
         trail.unshift({ x: hero.fx, y: hero.fy }); if (trail.length > 14) trail.pop(); hero.step++; if (hero.step % 4 === 0) AUDIO.sfx('step'); }
     }
@@ -91,7 +96,7 @@ var TOWN = (function () {
     people.forEach(function (p) {
       if (p.t > 0) { p.t -= dt / 0.5; if (p.t <= 0) { p.t = 0; p.fx = p.x; p.fy = p.y; } return; }
       p.wait -= dt; if (p.wait > 0) return; p.wait = rnd(2, 6);
-      if (Math.abs(p.x - hero.x) + Math.abs(p.y - hero.y) <= 1) return;
+      if (DIALOG.isActive() && Math.abs(p.x - hero.x) + Math.abs(p.y - hero.y) <= 1) return; // 話している相手は動かない(それ以外は、主人公のそばでも動いて道をあける)
       var d = pick([[1, 0], [-1, 0], [0, 1], [0, -1]]), nx = p.x + d[0], ny = p.y + d[1];
       if (Math.abs(nx - p.hx) > 1 || Math.abs(ny - p.hy) > 1) return;
       if (!passable(nx, ny) || PASS[tileAt(nx, ny)] >= 2 || occupied(nx, ny)) return;
