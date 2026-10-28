@@ -85,7 +85,7 @@ var BATTLEUI = (function () {
   function rowShake(target) { if (!reduced) S.rowShake = { target: target, t: 0.3 }; }
   function lunge(amp) { if (!reduced) S.lunge = { t: 0, amp: amp }; }
   function confetti() { for (var i = 0; i < 40; i++) S.confetti.push({ x: rnd(0, W), y: rnd(-300, -10), vy: rnd(120, 260), vx: rnd(-40, 40), e: i % 2 ? '✨' : '🎊', r: rnd(0, 6), t: 0 }); }
-  function peel() { S.peelT = 0.6; shake(6, 0.25); S.barFlash = 0.15; AUDIO.sfx('bighit'); }
+  function peel() { S.peelT = 0.6; shake(6, 0.25); S.barFlash = 0.15; AUDIO.sfx('peel'); }
 
   /* ---------- メッセージ窓 ---------- */
   function setMsg(lines, replace) {
@@ -533,11 +533,11 @@ var BATTLEUI = (function () {
     ATL.draw(S.heroFace, 24 + hx, HERO_Y, 32 * hs);
     txt('へっぽこ', 44 + hx, HERO_Y, 17, '#fff', 'left', 900, null);
     var p = S.view.heroMax ? S.shownHeroHp / S.view.heroMax : 0;
-    rrect(124, HERO_Y - 7, 160, 14, 7, '#3a2d55');
-    if (p > 0) { var blink = p <= 0.3 && Math.floor(G.t * 4) % 2 === 0; rrect(124, HERO_Y - 7, 160 * clamp(p, 0, 1), 14, 7, blink ? '#ff6a6a' : hpColor(p)); }
-    rrect(124, HERO_Y - 7, 160, 14, 7, null, '#fff', 2);
-    if (p <= 0.15 && p > 0 && Math.floor(G.t * 3) % 2 === 0) txt('ピンチ!', 204, HERO_Y, 14, '#ff6a6a', 'center', 900, '#fff');
-    txt(Math.ceil(S.shownHeroHp) + '/' + S.view.heroMax, 290, HERO_Y, 15, '#fff', 'left', 900, null);
+    rrect(124, HERO_Y - 7, 148, 14, 7, '#3a2d55');
+    if (p > 0) { var blink = p <= 0.3 && Math.floor(G.t * 4) % 2 === 0; rrect(124, HERO_Y - 7, 148 * clamp(p, 0, 1), 14, 7, blink ? '#ff6a6a' : hpColor(p)); }
+    rrect(124, HERO_Y - 7, 148, 14, 7, null, '#fff', 2);
+    if (p <= 0.15 && p > 0 && Math.floor(G.t * 3) % 2 === 0) txt('ピンチ!', 198, HERO_Y, 14, '#ff6a6a', 'center', 900, '#fff');
+    txt(Math.ceil(S.shownHeroHp) + '/' + S.view.heroMax, 278, HERO_Y, 15, '#fff', 'left', 900, null);
     // 仲間 10 組
     S.st.comps.forEach(function (c, i) {
       var v = S.view.comps[c.id] || { hp: c.hp, maxHp: c.maxHp, alive: c.alive, count: c.count };

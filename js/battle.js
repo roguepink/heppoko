@@ -4,15 +4,15 @@
 var BATTLE = (function () {
   var CONST = {
     DMG_SCALE_HERO: 20, DMG_SCALE_COMP: 70, HERO_BASE: { hp: 100, atk: 3, def: 2, spd: 5, luck: 5 },
-    BOSS_ATK: { single: 850, all: 450, big: 2000 }, BOSS_HEAL_RATE: 0.08, BOSS_HEAL_TIMES: 2,
-    GUARD_MUL: 0.3, GUARD_STANCE: [1, 0.2, 0.1, 0.07, 0.05], HERO_TARGET_P: 0.35, REPEAT_COMBO_MUL: 0.25,
-    ROLE_MUL: { attack: 1.0, guard: 0.6, heal: 0.4, support: 0.6, weird: 1.0 }, ALL_COMP_MUL: 0.7, COMP_DEF_BONUS: 0
+    BOSS_ATK: { single: 1000, all: 450, big: 2600 }, BOSS_HEAL_RATE: 0.08, BOSS_HEAL_TIMES: 2,
+    GUARD_MUL: 0.3, GUARD_STANCE: [1, 0.2, 0.1, 0.07, 0.05], HERO_TARGET_P: 0.5, REPEAT_COMBO_MUL: 0.25,
+    ROLE_MUL: { attack: 1.0, guard: 0.6, heal: 0.4, support: 0.6, weird: 1.0 }, ALL_COMP_MUL: 1.0, COMP_DEF_BONUS: 0
   };
   var PHASES = [
     { until: 0.70, name: 'よゆう', atk: 1.0, w: { normal: 45, all: 20, charge: 0, heal: 0, mood: 35 }, chargeGap: 99, moodP: 0.6, moods: ['boast', 'taunt', 'laugh', 'sleepy'] },
     { until: 0.40, name: 'いらいら', atk: 1.2, w: { normal: 35, all: 25, charge: 20, heal: 0, mood: 20 }, chargeGap: 3, moodP: 0.5, moods: ['angry', 'boast', 'sleepy', 'taunt', 'hungry'], enterMood: 'angry' },
     { until: 0.15, name: 'あせり', atk: 1.5, w: { normal: 30, all: 25, charge: 25, heal: 10, mood: 10 }, chargeGap: 3, moodP: 0.5, moods: ['cry', 'hungry', 'lonely', 'angry', 'laugh'], enterMood: 'cry' },
-    { until: 0.00, name: 'ほんき', atk: 2.0, w: { normal: 25, all: 35, charge: 40, heal: 0, mood: 0 }, chargeGap: 2, moodP: 0.3, moods: ['angry'], enterMood: 'charge' }
+    { until: 0.00, name: 'ほんき', atk: 3.0, w: { normal: 25, all: 35, charge: 40, heal: 0, mood: 0 }, chargeGap: 2, moodP: 0.3, moods: ['angry'], enterMood: 'charge' }
   ];
   var MOODS = {
     normal: { name: 'ふつう', emoji: '😈', atk: 1.0, taken: 1.0, skip: 0, len: 0, line: '' },
@@ -142,7 +142,7 @@ var BATTLE = (function () {
     var toks = str.split(' '), i = 0;
     while (i < toks.length) { var t = toks[i]; if (t === 'mood' || t === 'dmg' || t === 'batk' || t === 'hheal' || t === 'pheal' || t === 'bheal' || t === 'self' || t === 'buff' || t === 'vuln') { applyEffect(s, t + ' ' + toks[i + 1], events, cmdId, rng); i += 2; } else { applyEffect(s, t, events, cmdId, rng); i++; } }
   }
-  function setMood(s, m, events) { if (!MOODS[m]) return; s.boss.mood = m; s.boss.moodLeft = MOODS[m].len; ev(events, 'mood', { mood: m, text: MOODS[m].line }); }
+  function setMood(s, m, events) { if (!MOODS[m]) return; s.boss.mood = m; s.boss.moodLeft = MOODS[m].len; if (m === 'charge') s.boss.chargeTurn = s.turn; ev(events, 'mood', { mood: m, text: MOODS[m].line }); }
   function healHero(s, events, a) { var before = s.hero.hp; s.hero.hp = Math.min(s.hero.maxHp, s.hero.hp + a); ev(events, 'heal', { target: 'hero', amount: s.hero.hp - before }); }
 
   /* ① へっぽこのコマンド */
@@ -222,7 +222,7 @@ var BATTLE = (function () {
     if (b.skipNext > 0) { b.skipNext = 0; return 'none'; }
     if (md.skip >= 1) return 'none';
     if (md.skip > 0 && rng() < md.skip) return 'none';
-    if (b.mood === 'charge') return 'big';
+    if (b.mood === 'charge') return (b.chargeTurn === s.turn && b.chargeBy !== 'boss') ? 'charging' : 'big';
     var ph = PHASES[b.phase], w = {}, tot = 0;
     for (var k in ph.w) { var v = ph.w[k]; if (k === 'charge' && s.turn - b.lastChargeTurn < ph.chargeGap) v = 0; if (k === 'heal' && b.healsLeft <= 0) v = 0; w[k] = v; tot += v; }
     var r = rng() * tot; for (k in w) { r -= w[k]; if (r < 0) return k; }
@@ -256,7 +256,8 @@ var BATTLE = (function () {
         if (!alive.length || rng() < CONST.HERO_TARGET_P) hurtHero(s, events, CONST.BOSS_ATK.single, mul, rng, 'single');
         else hurtComp(s, alive[Math.floor(rng() * alive.length)], events, CONST.BOSS_ATK.single, mul, rng, 'single'); break; }
       case 'all': say('all', '大魔王の 全体こうげき!'); hurtHero(s, events, CONST.BOSS_ATK.all, mul, rng, 'all'); s.comps.slice().forEach(function (c) { if (c.alive) hurtComp(s, c, events, CONST.BOSS_ATK.all, mul, rng, 'all'); }); ev(events, 'shake', { power: 'mid' }); break;
-      case 'charge': b.lastChargeTurn = s.turn; setMood(s, 'charge', events); say('charge', '大魔王は 力を ためはじめた!!'); ev(events, 'warn', {}); break;
+      case 'charge': b.lastChargeTurn = s.turn; setMood(s, 'charge', events); b.chargeBy = 'boss'; say('charge', '大魔王は 力を ためはじめた!!'); ev(events, 'warn', {}); break;
+      case 'charging': ev(events, 'boss', { action: 'charging', text: '大魔王は ぶるぶる ふるえながら 力を ためている…!' }); break;
       case 'big': b.mood = 'normal'; b.moodLeft = 0; say('big', 'くらえーーっ!! 大魔王の おおわざ!!'); ev(events, 'bigattack', { guardCount: s.guardCount });
         hurtHero(s, events, CONST.BOSS_ATK.big, mul, rng, 'big'); s.comps.slice().forEach(function (c) { if (c.alive) hurtComp(s, c, events, CONST.BOSS_ATK.big, mul, rng, 'big'); }); ev(events, 'shake', { power: 'big' }); break;
       case 'heal': { b.healsLeft--; var h = Math.floor(b.maxHp * CONST.BOSS_HEAL_RATE); b.hp = Math.min(b.maxHp, b.hp + h); say('heal', '大魔王は 傷を なめて 回復した'); ev(events, 'heal', { target: 'boss', amount: h }); break; }
@@ -277,7 +278,7 @@ var BATTLE = (function () {
     if (ni > s.boss.phase) {
       s.boss.phase = ni; var ph = PHASES[ni];
       ev(events, 'phase', { phase: ni, name: ph.name });
-      if (ph.enterMood && s.boss.mood !== 'charge') { if (ph.enterMood === 'charge') { s.boss.lastChargeTurn = s.turn; } setMood(s, ph.enterMood, events); if (ph.enterMood === 'charge') ev(events, 'warn', {}); }
+      if (ph.enterMood && s.boss.mood !== 'charge') { if (ph.enterMood === 'charge') { s.boss.lastChargeTurn = s.turn; s.boss.chargeBy = 'phase'; } setMood(s, ph.enterMood, events); if (ph.enterMood === 'charge') ev(events, 'warn', {}); }
     }
   }
   function checkEnd(s) { if (s.boss.hp <= 0) return 'win'; if (s.hero.hp <= 0) return 'lose'; return null; }

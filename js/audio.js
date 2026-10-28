@@ -92,6 +92,7 @@ var AUDIO = (function () {
       case 'warn': for (var j = 0; j < 3; j++) { tone(880, t + j * 0.18, 0.08, 'square', 0.18); tone(440, t + j * 0.18, 0.08, 'square', 0.12); } break;
       case 'guard': tone(220, t, 0.08, 'triangle', 0.18); tone(330, t + 0.05, 0.2, 'triangle', 0.14); noise(t, 0.05, 0.1); break;
       case 'fanfare': [523, 523, 523, 659, 784, 659, 784].forEach(function (f, i) { tone(f, t + [0, .15, .3, .45, .75, .95, 1.1][i], [.12, .12, .12, .28, .18, .18, .6][i], 'square', 0.16); }); break;
+      case 'peel': tone(1200, t, 0.1, 'square', 0.14); tone(400, t + 0.08, 0.2, 'square', 0.14); noise(t, 0.2, 0.15); break;
       case 'shutter': noise(t, 0.04, 0.3); tone(2000, t, 0.03, 'square', 0.1); noise(t + 0.08, 0.04, 0.2); break;
       case 'lose': [392, 370, 349, 330].forEach(function (f, i) { tone(f, t + i * 0.25, 0.3, 'sawtooth', 0.14); }); break;
       case 'laugh': [300, 280, 300, 280, 260].forEach(function (f, i) { tone(f, t + i * 0.1, 0.09, 'square', 0.1); }); break;
