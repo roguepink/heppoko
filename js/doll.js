@@ -6,24 +6,36 @@
    そのため「描く道具の束 T = { c: 2D context, em: 絵文字を描く関数 }」を全部の描画関数に渡す。 */
 var DOLL = (function () {
   var SKIN = '#ffd9b3', SKIN_EDGE = '#e0a97a', INK = '#1b1430';
+  var HAIR = '#6b4226', HAIR_HI = '#8a5a35';                    // 髪(茶色のマッシュルーム)
+  var SHIRT = '#ffffff', SHIRT_EDGE = '#d9cdc0', PANTS = '#3f7fd9', PANTS_EDGE = '#2c5fae';   // ふだん着
+  var SOCK = '#ffffff', SHOE = '#e63e3e', SHOE_EDGE = '#b02a2a'; // 白い靴下・赤い靴
   var CX = 195, CY = 345;                 // 設計の人形の中心
   var TAU = Math.PI * 2;
 
-  /* 装備の位置(設計 7-2。通常ポーズのとき)。空きスロットの点線の丸・お披露目のフラッシュに使う */
+  /* 素体の寸法(2.3 頭身: 頭 156px : 体+足 204px)。設計 7-2 の座標系(縦 400px、y=145〜545)に合わせてある */
+  var HEAD = { x: 195, y: 248, r: 78 };                       // 頭(丸)。上端 170・あご 326
+  var NECK = { x: 195, y: 322 };                              // 首(頭を傾ける原点)
+  var BODY = { x: 143, y: 318, w: 104, h: 128, r: 30 };       // 体の角丸(318〜446)
+  var SHOULDER = { dx: 50, y: 338 }, ARM_LEN = 66, HAND_R = 15; // 肩の原点と腕の長さ
+  var HIP = { dx: 22, y: 440 }, LEG_LEN = 60;                 // 股関節と足の長さ
+  var TORSO_C = { x: 195, y: 405 };                           // 「体の外側」を決める中心(武器を手の外側に出すのに使う)
+
+  /* 装備の位置(通常ポーズのとき)。お披露目のフラッシュ・光らせる部位に使う */
   var SLOT_POS = {
-    head: [195, 160], face: [195, 238], charm: [195, 302], body: [195, 375], cape: [292, 292],
-    waist: [195, 442], rhand: [111, 390], lhand: [279, 390], ring: [263, 408], feet: [195, 510]
+    head: [195, 150], face: [195, 254], charm: [195, 342], body: [195, 382], cape: [292, 300],
+    waist: [195, 442], rhand: [108, 404], lhand: [282, 404], ring: [268, 418], feet: [195, 508]
   };
 
   /* ポーズ表。腕・足の角度は「外側(体から離れる向き)に上がる = プラス」で統一(ラジアン。0 = まっすぐ下)。
-     body = 腰を軸にした上半身の傾き、head = 首を軸にした頭の傾き、dy = 全体の上下、shadow = 影の横半径 */
+     body = 腰を軸にした上半身の傾き、head = 首を軸にした頭の傾き、dy = 全体の上下、shadow = 影の横半径
+     腕を上げる角度は 2.0 前後まで(それ以上だと、大きな頭に手がかぶる) */
   var POSES = {
     normal: { rArm: 0.25, lArm: 0.25, rLeg: 0.00, lLeg: 0.00, body: 0.00, head: 0.00, dy: 0, face: '😊', shadow: 90, cape: 0 },
-    hero:   { rArm: 2.30, lArm: 0.55, rLeg: 0.15, lLeg: 0.15, body: -0.04, head: -0.08, dy: 0, face: '😤', shadow: 90, cape: -0.15 },
-    peace:  { rArm: 0.25, lArm: 2.15, rLeg: 0.00, lLeg: 0.10, body: 0.00, head: 0.10, dy: 0, face: '😆', shadow: 90, cape: 0 },
+    hero:   { rArm: 2.00, lArm: 0.55, rLeg: 0.15, lLeg: 0.15, body: -0.04, head: -0.08, dy: 0, face: '😤', shadow: 90, cape: -0.15 },
+    peace:  { rArm: 0.25, lArm: 1.95, rLeg: 0.00, lLeg: 0.10, body: 0.00, head: 0.10, dy: 0, face: '😆', shadow: 90, cape: 0 },
     smug:   { rArm: 0.30, lArm: 0.60, rLeg: 0.00, lLeg: 0.30, body: -0.10, head: -0.15, dy: 0, face: '😎', shadow: 90, cape: -0.3 },
-    jump:   { rArm: 2.05, lArm: 2.05, rLeg: 0.40, lLeg: 0.40, body: 0.00, head: 0.00, dy: -40, face: '😝', shadow: 50, cape: 0.1 },
-    money:  { rArm: 2.10, lArm: 2.10, rLeg: 0.10, lLeg: 0.10, body: -0.05, head: 0.05, dy: -6, face: '🤑', shadow: 90, cape: 0 },
+    jump:   { rArm: 1.90, lArm: 1.90, rLeg: 0.40, lLeg: 0.40, body: 0.00, head: 0.00, dy: -40, face: '😝', shadow: 50, cape: 0.1 },
+    money:  { rArm: 1.95, lArm: 1.95, rLeg: 0.10, lLeg: 0.10, body: -0.05, head: 0.05, dy: -6, face: '🤑', shadow: 90, cape: 0 },
     sleep:  { rArm: 0.35, lArm: 0.35, rLeg: 0.05, lLeg: 0.05, body: 0.00, head: 0.10, dy: 0, face: '😴', shadow: 150, cape: 0, lie: true }
   };
 
@@ -84,6 +96,15 @@ var DOLL = (function () {
     c.restore();
   }
 
+  /* 装備の色(data.js の look.color)。体の装備で体を塗るのに使う */
+  function lookColor(eq, slot) { var it = itemOf(eq[slot]); return (it && it.look && it.look.color) || null; }
+
+  /* 体の角丸のパス(体の装備をクリップする・体を塗るのに共通で使う) */
+  function bodyPath(c) {
+    var b = BODY, x = b.x, y = b.y, w = b.w, h = b.h, r = b.r;
+    c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+  }
+
   /* ---------- 人形本体 ---------- */
   function drawDoll(T, cx, cy, scale, opts) {
     opts = opts || {};
@@ -99,94 +120,142 @@ var DOLL = (function () {
       c.save(); c.setLineDash([5, 5]); c.strokeStyle = 'rgba(27,20,48,.25)'; c.lineWidth = 2.5;
       c.beginPath(); c.arc(x, y, r || 22, 0, TAU); c.stroke(); c.restore();
     }
+    var bodyEm = look(eq, 'body'), bodyCol = lookColor(eq, 'body');
+    var sleeveCol = bodyEm ? (bodyCol || SHIRT) : SHIRT;   // そでの色は服に合わせる
 
     c.save();
     c.translate(cx, cy); c.scale(scale, scale); c.translate(-CX, -CY);
 
-    /* 2 影(地面に固定。ジャンプでは小さく、寝ポーズでは横長) */
-    c.fillStyle = 'rgba(0,0,0,.22)'; c.beginPath(); c.ellipse(195, 545, pose.shadow, 14, 0, 0, TAU); c.fill();
+    /* 影(地面に固定。ジャンプでは小さく、寝ポーズでは横長) */
+    c.fillStyle = 'rgba(0,0,0,.22)'; c.beginPath(); c.ellipse(195, pose.lie ? 512 : 540, pose.shadow, 14, 0, 0, TAU); c.fill();
 
-    if (pose.lie) {   // 寝ポーズ: 💤 を出してから、人形ごと横に倒す(頭が画面の左)
-      T.em('💤', 90 + Math.sin(t * 2) * 4, 400 - (t * 20 % 30), 40, 0.9);
-      T.em('💤', 130, 372 - (t * 14 % 24), 26, 0.6);
-      c.translate(0, 135); c.translate(195, 345); c.rotate(-Math.PI / 2 + 0.1); c.translate(-195, -345);
+    if (pose.lie) {   // 寝ポーズ: 💤 を出してから、人形ごと横に倒す(頭が画面の左)。写真の赤い帯に足がかからないよう 下げすぎない
+      T.em('💤', 90 + Math.sin(t * 2) * 4, 380 - (t * 20 % 30), 40, 0.9);
+      T.em('💤', 130, 352 - (t * 14 % 24), 26, 0.6);
+      c.translate(0, 105); c.translate(195, 345); c.rotate(-Math.PI / 2 + 0.1); c.translate(-195, -345);
     }
     c.translate(0, pose.dy + breath);
 
-    /* 1 マント(いちばん後ろ)。首 (195,300) を原点に風で揺れる */
+    /* 1 マント(いちばん後ろ)。首を原点に風で揺れる */
     var cape = look(eq, 'cape');
     if (cape) {
-      c.save(); c.translate(195, 300); c.rotate(Math.sin(t * 1.3) * 0.04 + pose.cape); c.translate(-195, -300);
-      T.em(cape, 195, 385, 190 * K('cape')); c.restore();
+      c.save(); c.translate(NECK.x, NECK.y); c.rotate(Math.sin(t * 1.3) * 0.04 + pose.cape); c.translate(-NECK.x, -NECK.y);
+      T.em(cape, 230, 392, 180 * K('cape')); c.restore();   // 体のかげに全部隠れないよう、右へなびかせて描く(🧣 🦸 など細い絵文字のため)
     } else dotted(SLOT_POS.cape[0], SLOT_POS.cape[1]);
 
-    /* 3 足(股関節 (170,440)/(220,440) を原点に回す。足の装備は足の変換の中) */
+    /* 2 足(股関節を原点に回す。靴下・靴・足の装備は足の変換の中) */
     function leg(sd, th) {   // sd = -1 右足(画面左) / +1 左足(画面右)
-      c.save(); c.translate(195 + sd * 25, 440); c.rotate(-sd * th);
-      RR(c, -15, -8, 30, 70, 12, SKIN);
+      c.save(); c.translate(195 + sd * HIP.dx, HIP.y); c.rotate(-sd * th);
+      RR(c, -13, -8, 26, LEG_LEN + 8, 11, SKIN);                           // 肌
+      RR(c, -14, LEG_LEN - 22, 28, 24, 6, SOCK, SKIN_EDGE, 1.5);            // 白い靴下
       var fe = look(eq, 'feet');
-      if (fe) T.em(fe, 0, 70, 58 * K('feet')); else RR(c, -20, 58, 40, 22, 9, '#6d4c2a');
+      if (fe) T.em(fe, 0, LEG_LEN + 10, 56 * K('feet'));
+      else {   // 赤い靴(つま先は少し外側へ)
+        RR(c, -18 + sd * 3, LEG_LEN - 2, 36, 22, 9, SHOE, SHOE_EDGE, 2);
+        c.fillStyle = 'rgba(255,255,255,.55)'; c.beginPath(); c.ellipse(sd * 4, LEG_LEN + 5, 7, 3, 0, 0, TAU); c.fill();   // つやの光
+      }
       c.restore();
     }
     leg(-1, pose.rLeg); leg(1, pose.lLeg);
 
-    /* 上半身(腰 (195,445) を原点に傾く) */
+    /* 上半身(腰を原点に傾く) */
     c.save(); c.translate(195, 445); c.rotate(pose.body); c.translate(-195, -445);
 
-    /* 4 体(素体)+ 服 */
-    RR(c, 140, 305, 110, 140, 34, SKIN);
-    var body = look(eq, 'body');
-    if (body) T.em(body, 195, 375, 150 * K('body'));
-    else {   // 服なし: 白い はだぎ
-      RR(c, 158, 332, 74, 98, 22, '#ffffff', '#e8d9c8', 2);
-      c.strokeStyle = '#e8d9c8'; c.lineWidth = 2; c.beginPath(); c.moveTo(195, 340); c.lineTo(195, 420); c.stroke();
-      dotted(195, 375);
+    /* 3 体(素体)+ 服 */
+    if (bodyEm) {   // 服あり: 体の角丸を服の色で塗り、絵文字を体の中にクリップして収める(はみ出さない)
+      bodyPath(c); c.fillStyle = bodyCol || '#eee'; c.fill();
+      c.save(); bodyPath(c); c.clip();
+      c.fillStyle = 'rgba(255,255,255,.18)'; c.fillRect(BODY.x, BODY.y, BODY.w, BODY.h / 2);   // 上半分をほんのり明るく
+      T.em(bodyEm, 195, 383, 118 * K('body'));
+      c.restore();
+      bodyPath(c); c.lineWidth = 2.5; c.strokeStyle = 'rgba(27,20,48,.35)'; c.stroke();
+    } else {        // 服なし: 白い半そでシャツ + 青い半ズボン
+      bodyPath(c); c.fillStyle = SHIRT; c.fill();
+      c.save(); bodyPath(c); c.clip();
+      c.fillStyle = PANTS; c.fillRect(BODY.x, 398, BODY.w, 60);                                 // ズボン
+      c.strokeStyle = PANTS_EDGE; c.lineWidth = 2; c.beginPath(); c.moveTo(195, 404); c.lineTo(195, 446); c.stroke();   // まん中の縫い目
+      c.beginPath(); c.moveTo(BODY.x, 398); c.lineTo(BODY.x + BODY.w, 398); c.stroke();
+      c.restore();
+      bodyPath(c); c.lineWidth = 2.5; c.strokeStyle = SHIRT_EDGE; c.stroke();
+      c.strokeStyle = SHIRT_EDGE; c.lineWidth = 2; c.beginPath(); c.moveTo(183, 320); c.lineTo(195, 334); c.lineTo(207, 320); c.stroke();   // えり
+      dotted(195, 366);
     }
-    /* 5 腰 */
+    /* 4 腰 */
     var waist = look(eq, 'waist');
-    if (waist) T.em(waist, 195, 442, 66 * K('waist')); else dotted(195, 442);
+    if (waist) T.em(waist, 195, 442, 60 * K('waist')); else dotted(195, 442, 20);
 
-    /* 6〜9 頭(首 (195,300) を原点に傾く) */
-    c.save(); c.translate(195, 300); c.rotate(pose.head); c.translate(-195, -300);
-    c.fillStyle = SKIN; c.beginPath(); c.arc(195, 230, 60, 0, TAU); c.fill();
-    c.lineWidth = 3; c.strokeStyle = SKIN_EDGE; c.stroke();
-    T.em(face, 195, 230, 118);                                   // 表情
-    var fc = look(eq, 'face');
-    if (fc) T.em(fc, 195, 238, 76 * K('face'));
-    else { dotted(176, 236, 13); dotted(214, 236, 13); }         // メガネの形の点線 = かお の空き
-    /* 8 お守り(ひも + 絵文字) */
+    /* 5 お守り(ひも + 絵文字)。頭より先に描いて、ひもの上端は あごの下に隠れる */
     var charm = look(eq, 'charm');
     if (charm) {
-      c.strokeStyle = INK; c.lineWidth = 2; c.beginPath(); c.moveTo(165, 268); c.lineTo(195, 296); c.lineTo(225, 268); c.stroke();
-      T.em(charm, 195, 302, 44 * K('charm'));
-    } else dotted(195, 302, 18);
-    /* 9 頭の上(帽子)。王冠は少し小さく高く */
-    var head = look(eq, 'head');
-    if (head) { var crown = head === '👑'; T.em(head, 195, crown ? 150 : 160, (crown ? 86 : 96) * K('head')); }
-    else dotted(195, 160);
-    c.restore();   // 頭
+      c.strokeStyle = INK; c.lineWidth = 2; c.beginPath(); c.moveTo(168, 316); c.lineTo(195, 338); c.lineTo(222, 316); c.stroke();
+      T.em(charm, 195, 344, 40 * K('charm'));
+    } else dotted(195, 346, 16);
 
-    /* 10〜12 腕(肩 (160,320)/(230,320) を原点に回す。武器・指輪は腕の変換の中で描くので一緒に動く) */
-    function arm(sd, th, slot) {   // sd = -1 右腕(画面左) / +1 左腕(画面右)
-      c.save(); c.translate(195 + sd * 35, 320); c.rotate(-sd * th);
-      RR(c, -13, -12, 26, 86, 13, SKIN);                          // 腕
-      c.fillStyle = SKIN; c.beginPath(); c.arc(0, 76, 20, 0, TAU); c.fill();   // 手
-      var w = look(eq, slot);
-      if (w) { c.save(); c.translate(sd * 28, 78); c.rotate(sd * 0.3); T.em(w, 0, 0, 92 * K(slot)); c.restore(); }
-      else dotted(sd * 28, 78);
-      if (sd === 1) {   // 指輪は左手の下側。✨ が 0.5 秒ごとに点滅
-        var ring = look(eq, 'ring');
-        if (ring) { T.em(ring, 10, 94, 34 * K('ring')); if (Math.floor(t * 2) % 2 === 0) T.em('✨', 24, 82, 16); }
-        else dotted(10, 94, 14);
-      }
+    /* 6 腕(肩を原点に回す。そでは服の色) */
+    function arm(sd, th) {   // sd = -1 右腕(画面左) / +1 左腕(画面右)
+      c.save(); c.translate(195 + sd * SHOULDER.dx, SHOULDER.y); c.rotate(-sd * th);
+      RR(c, -11, -10, 22, ARM_LEN + 6, 11, SKIN);                            // 腕
+      c.fillStyle = SKIN; c.beginPath(); c.arc(0, ARM_LEN, HAND_R, 0, TAU); c.fill();   // 丸い手
+      RR(c, -13, -12, 26, 30, 11, sleeveCol, 'rgba(27,20,48,.3)', 2);        // 半そで
       c.restore();
     }
-    arm(-1, pose.rArm, 'rhand'); arm(1, pose.lArm, 'lhand');
+    arm(-1, pose.rArm); arm(1, pose.lArm);
+
+    /* 7 頭(首を原点に傾く): 肌の丸 → 表情 → 髪 → ほっぺ → かおの装備 → 帽子 */
+    c.save(); c.translate(NECK.x, NECK.y); c.rotate(pose.head); c.translate(-NECK.x, -NECK.y);
+    var hx = HEAD.x, hy = HEAD.y, hr = HEAD.r;
+    c.fillStyle = SKIN; c.lineWidth = 3; c.strokeStyle = SKIN_EDGE;
+    c.beginPath(); c.arc(hx - hr + 2, hy + 10, 13, 0, TAU); c.fill(); c.stroke();   // 耳
+    c.beginPath(); c.arc(hx + hr - 2, hy + 10, 13, 0, TAU); c.fill(); c.stroke();
+    c.beginPath(); c.arc(hx, hy, hr, 0, TAU); c.fill(); c.stroke();                 // 顔の丸
+    T.em(face, hx, hy + 6, 108);                                 // 表情(肌の丸より少し小さく、ふちを残す)
+    /* 髪: 頭より少し大きい丸の上半分 + 前髪のギザギザ + 横の毛(マッシュルーム) */
+    c.save();
+    c.beginPath(); c.arc(hx, hy + 2, hr + 5, 0, TAU); c.clip();
+    c.fillStyle = HAIR;
+    c.fillRect(hx - hr - 6, hy - hr - 6, (hr + 6) * 2, hr - 28);               // 上のかたまり(下端 y=hy-34。目にかぶらない高さ)
+    var bx = [-56, -28, 0, 28, 56], i;
+    for (i = 0; i < bx.length; i++) { c.beginPath(); c.arc(hx + bx[i], hy - 35, 16, 0, Math.PI); c.fill(); }   // 前髪の丸いギザギザ
+    RR(c, hx - hr - 6, hy - 40, 20, 54, 9, HAIR); RR(c, hx + hr - 14, hy - 40, 20, 54, 9, HAIR);            // 横の毛(耳にかかる)
+    c.fillStyle = HAIR_HI; c.beginPath(); c.ellipse(hx - 24, hy - 60, 20, 6, -0.3, 0, TAU); c.fill();     // つや
+    c.restore();
+    /* ほっぺの赤み */
+    c.fillStyle = 'rgba(255,105,125,.42)';
+    c.beginPath(); c.ellipse(hx - 48, hy + 26, 13, 8, 0, 0, TAU); c.fill();
+    c.beginPath(); c.ellipse(hx + 48, hy + 26, 13, 8, 0, 0, TAU); c.fill();
+    var fc = look(eq, 'face');
+    if (fc) T.em(fc, hx, hy + 6, 80 * K('face'));
+    else dotted(hx + 62, hy - 52, 10);                           // かお の空き: 表情にかぶらないよう 顔の右上に小さく
+    /* 8 頭の上(帽子)。髪の上に乗る。王冠は少し小さく高く */
+    var head = look(eq, 'head');
+    if (head) { var crown = head === '👑'; T.em(head, 195, crown ? 140 : 150, (crown ? 86 : 96) * K('head')); }
+    else dotted(195, 150);
+    c.restore();   // 頭
+
+    /* 9 武器・指輪(頭のあとに描く。手の位置は腕の角度から計算し、武器は「体から見て手の外側」に出して顔にかぶらないようにする) */
+    function hand(sd, th) {   // 腕の変換と同じ式で手の中心(上半身の座標)を出す
+      var sx = 195 + sd * SHOULDER.dx, sy = SHOULDER.y;
+      return { x: sx + sd * ARM_LEN * Math.sin(th), y: sy + ARM_LEN * Math.cos(th) };
+    }
+    function held(sd, th, slot) {
+      var h = hand(sd, th), vx = h.x - TORSO_C.x, vy = h.y - TORSO_C.y, len = Math.sqrt(vx * vx + vy * vy) || 1;
+      var ox = vx / len, oy = vy / len;                           // 体の中心 → 手 の向き(外側)
+      var wx = h.x + ox * 30, wy = h.y + oy * 30;
+      var w = look(eq, slot);
+      if (w) { c.save(); c.translate(wx, wy); c.rotate(sd * 0.3 - sd * th * 0.45); T.em(w, 0, 0, 88 * K(slot)); c.restore(); }
+      else dotted(wx, wy, 20);
+      if (sd === 1) {   // 指輪は左手の下側。✨ が 0.5 秒ごとに点滅
+        var ring = look(eq, 'ring');
+        if (ring) { T.em(ring, h.x + 6, h.y + 14, 32 * K('ring')); if (Math.floor(t * 2) % 2 === 0) T.em('✨', h.x + 20, h.y + 2, 16); }
+        else dotted(h.x + 6, h.y + 14, 12);
+      }
+    }
+    held(-1, pose.rArm, 'rhand'); held(1, pose.lArm, 'lhand');
     c.restore();   // 上半身
 
     /* ポーズのおまけ */
     if (poseName === 'money') {   // 札束ばらまき: 💴💸 を 6 枚、周りにふわふわ
-      for (var i = 0; i < 6; i++) {
+      for (i = 0; i < 6; i++) {
         var ang = i * TAU / 6 + t * 0.4, d = 150 + Math.sin(t * 2 + i) * 12;
         T.em(i % 2 ? '💸' : '💴', 195 + Math.cos(ang) * d, 330 + Math.sin(ang) * d * 0.8 - 20, 44, 0.95);
       }
