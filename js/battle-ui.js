@@ -265,7 +265,7 @@ var BATTLEUI = (function () {
     try { localStorage.removeItem('heppoko.battle'); } catch (e) {}
     if (window.P) { P.discovered = P.discovered || {}; for (var k in S.st.discovered) P.discovered[k] = true; }
     G.lastBattle = { turns: S.st.turn, combos: S.st.combos, finisher: S.finisher || 'へっぽこ', won: result === 'win' };
-    hide(S.dom.cmds); hide(S.dom.grid); S.dom.hint.textContent = '';
+    hide(S.dom.cmds); hide(S.dom.grid); S.dom.hint.textContent = ''; hide(S.dom.hint);
     var L = window.DATA.BOSS.lines;
     if (result === 'win') {
       S.queue.push({ type: 'win' });
@@ -291,7 +291,7 @@ var BATTLEUI = (function () {
     S.mode = 'wait'; S.cur = null; S.view = snapshot(S.st);
     S.hint = BATTLE.hintFor(S.st);
     setMsg([S.hint.line || 'どうする?'], true);
-    S.dom.hint.textContent = S.hint.tip ? speaker() + '「' + S.hint.tip + '」' : '';
+    S.dom.hint.textContent = S.hint.tip ? speaker() + '「' + S.hint.tip + '」' : ''; S.dom.hint.classList.toggle('hidden', !S.hint.tip);
     S.dom.bGuard.classList.toggle('guardglow', !!S.hint.guardGlow);
     S.dom.bGuard.style.transform = S.hint.guardGlow ? 'scale(1.08)' : '';
     show(S.dom.cmds); setCmdsEnabled(true);
@@ -305,7 +305,7 @@ var BATTLEUI = (function () {
   function choose(cmd) {
     if (!S || S.mode !== 'wait') return false;
     S.mode = 'play'; setCmdsEnabled(false); hide(S.dom.grid); hideBubble();
-    S.dom.hint.textContent = ''; S.dom.bGuard.classList.remove('guardglow'); S.dom.bGuard.style.transform = '';
+    S.dom.hint.textContent = ''; hide(S.dom.hint); S.dom.bGuard.classList.remove('guardglow'); S.dom.bGuard.style.transform = '';
     var res = BATTLE.runTurn(S.st, cmd, ITEMSREF(), window.DATA.BOSS, S.rng);
     var ended = res.events.some(function (e) { return e.type === 'end'; });
     if (!ended) save();
@@ -360,7 +360,7 @@ var BATTLEUI = (function () {
   /* ---------- DOM を作る ---------- */
   function buildDom() {
     var root = el('div'); root.id = 'battle'; root.style.pointerEvents = 'none'; // 子だけ押せる(canvas のタップを通す)
-    var hint = el('div', 'hint'); hint.style.cssText = 'top:308px;font-size:15px;line-height:1.3;pointer-events:none';
+    var hint = el('div', 'hint hidden'); hint.style.cssText = 'top:296px;font-size:15px;line-height:1.3;pointer-events:none;background:rgba(27,20,48,.85);border-radius:12px;padding:3px 10px'; // フキダシ型(炎に重なっても読める)
     var msg = el('div', 'msg'); msg.style.pointerEvents = 'auto';
     var body = el('div', 'body'); var next = el('div', 'next', '▼'); msg.appendChild(body); msg.appendChild(next);
     msg.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); onTap(); });
@@ -490,7 +490,7 @@ var BATTLEUI = (function () {
     if (S.view.phase >= 3) sc *= 1.08;
     // 足元の炎
     var fl = 1 + 0.12 * Math.sin(G.t * 9), fl2 = 1 + 0.12 * Math.cos(G.t * 7);
-    if (S.spin < 0) { ATL.draw('🔥', 150, 292, 60 * fl); ATL.draw('🔥', 240, 292, 60 * fl2); }
+    if (S.spin < 0) { ATL.draw('🔥', 150, 284, 56 * fl); ATL.draw('🔥', 240, 284, 56 * fl2); }
     ctx.save(); ctx.translate(BOSS_CX, BOSS_CY + dy); ctx.rotate(rot); ctx.scale(sc, sc);
     // 角(三角 2 つ)
     ctx.fillStyle = '#c0392b'; ctx.beginPath(); ctx.moveTo(-60, -70); ctx.lineTo(-30, -78); ctx.lineTo(-45, -112); ctx.closePath(); ctx.fill();

@@ -4,6 +4,7 @@ var TOWN = (function () {
   var hero = { x: 0, y: 0, px: 0, py: 0, fx: 0, fy: 0, t: 0, moving: false, path: [], dir: 'down', step: 0 };
   var trail = [], cam = { x: 0, y: 0 }, target = null, people = [], bottom = null, tipI = 0, tipT = 0, held = null, justIn = false, hintShown = false;
   var VIEW_Y = 52, VIEW_H = 576, SPEED = 0.18;
+  var PLACE_NAME = { weapon: '⚔️ 武器屋', armor: '🛡️ 防具屋', accessory: '💍 アクセサリー屋', zakka: '🧺 雑貨屋', church: '⛪ 教会', inn: '🛏️ 宿', home: '🏠 へっぽこの家', aunt: '🏡 隣のおばさんの家', castle: '🏰 お城' };
   var TIPS = ['噴水の 広場で 人に 話しかけてみよう', '店の 扉に 乗ると 中に 入れる', '仲間は 10組まで。おばさんは 強いらしい…', '装備すると「見た目」が 大画面で 出るよ', '南の 出口から 大魔王の ところへ', '買った物は「そうび」で つけかえ', '仲間の 誘い方は いろいろ。お金・お願い・なぞなぞ', 'セーブは「セーブ」ボタンで いつでも'];
 
   function buildPeople() {
@@ -129,7 +130,9 @@ var TOWN = (function () {
       if (hero.qt > 0) ATL.draw(hero.q, x + 14, y - 26, 18); } });
     list.sort(function (a, b) { return a.y - b.y; }).forEach(function (o) { o.f(); });
     if (mapCanvasTop) ctx.drawImage(mapCanvasTop, ox, oy);
-    // 看板・家の名前(主人公が近いとき)
+    // 近くの扉に 場所の名前を出す
+    for (var dk in DOORS) { var dp = dk.split(',').map(Number); if (Math.abs(dp[0] - hero.x) + Math.abs(dp[1] - hero.y) <= 2) { var nm = PLACE_NAME[DOORS[dk]] || ''; var lx = ox + dp[0] * TILE + 16, ly = oy + dp[1] * TILE - 14; ctx.font = '900 13px ' + TEXT_FONT; var tw = ctx.measureText(nm).width + 16; rrect(lx - tw / 2, ly - 11, tw, 22, 8, 'rgba(255,250,240,.95)', PAL.ink, 2); txt(nm, lx, ly + 1, 13, PAL.ink, 'center', 900, null); } }
+    if (Math.abs(11.5 - hero.x) <= 2 && hero.y >= 21) { rrect(ox + 12 * TILE - 70, oy + 23 * TILE - 26, 140, 22, 8, 'rgba(255,224,102,.95)', PAL.ink, 2); txt('▼ 大魔王の ところへ', ox + 12 * TILE, oy + 23 * TILE - 15, 13, PAL.ink, 'center', 900, null); }
     ctx.restore();
     if (SETTINGS.dpad) drawDpad();
   }
