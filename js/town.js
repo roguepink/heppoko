@@ -5,7 +5,7 @@ var TOWN = (function () {
   var trail = [], cam = { x: 0, y: 0 }, target = null, people = [], bottom = null, tipI = 0, tipT = 0, held = null, justIn = false, hintShown = false;
   var VIEW_Y = 52, VIEW_H = 576, SPEED = 0.18;
   var PLACE_NAME = { weapon: '⚔️ 武器屋', armor: '🛡️ 防具屋', accessory: '💍 アクセサリー屋', zakka: '🧺 雑貨屋', church: '⛪ 教会', inn: '🛏️ 宿', home: '🏠 へっぽこの家', aunt: '🏡 隣のおばさんの家', castle: '🏰 お城' };
-  var TIPS = ['噴水の 広場で 人に 話しかけてみよう', '店の 扉に 乗ると 中に 入れる', '仲間は 10組まで。おばさんは 強いらしい…', '装備すると「見た目」が 大画面で 出るよ', '南の 出口から 大魔王の ところへ', '買った物は「そうび」で つけかえ', '仲間の 誘い方は いろいろ。お金・お願い・なぞなぞ', 'セーブは「セーブ」ボタンで いつでも'];
+  var TIPS = ['噴水の 広場で 人に 話しかけてみよう', '店の 扉に 乗ると 中に 入れる', '仲間は 10組まで。おばさんは 強いらしい…', '装備すると「見た目」が 大画面で 出るよ', '▼ 南の 出口から 大魔王の ところへ。そのまえに 仲間と そうびを!', '隣の おばさんの家は へっぽこの家の 右下。小さい 赤い 屋根の 家', '買った物は「そうび」で つけかえ', '仲間の 誘い方は いろいろ。お金・お願い・なぞなぞ', 'セーブは「セーブ」ボタンで いつでも'];
 
   function buildPeople() {
     people = [];
@@ -27,7 +27,7 @@ var TOWN = (function () {
     row.appendChild(btn('<span class="e">💾</span>セーブ', 'lav', function () { toast(saveGame() ? '✅ セーブした' : '❌ 保存できなかった'); }));
     bottom.appendChild(row); bottom.appendChild(el('div', 'stat', '')); bottom.appendChild(el('div', 'tip', '')); ui.appendChild(bottom);
   }
-  function refreshStat() { if (!bottom) return; var st = heroStats(); bottom.querySelector('.stat').textContent = '⚔️攻 ' + st.atk + '  🛡️守 ' + st.def + '  ❤️HP ' + st.hp + '  👥 ' + P.party.length + '/10組'; }
+  function refreshStat() { if (!bottom) return; var st = heroStats(); var g = roleCounts().guard; bottom.querySelector('.stat').innerHTML = '⚔️攻 ' + st.atk + ' 🛡️守 ' + st.def + ' ❤️HP ' + st.hp + ' 👥 ' + P.party.length + '/10組 <span' + (g ? '' : ' class="gz"') + '>🛡️×' + g + '</span>'; }
   function setTip(s) { if (bottom) bottom.querySelector('.tip').textContent = '💬 ' + s; }
 
   /* 目標までの道 */

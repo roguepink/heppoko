@@ -124,7 +124,7 @@ var BATTLEUI = (function () {
       case 'heal': m = moveText('heal'); return m ? m.text : e.text;
       case 'charge': m = moveText('big'); if (m) { S.bigMove = m.id; return m.text; } return e.text;
       case 'big': { var mv = (window.DATA.BOSS.moves || []).filter(function (x) { return x.id === S.bigMove; })[0];
-        var nm = mv ? mv.name.replace(/[(（].*?[)）]/g, '') : ''; return (nm ? '大魔王の ' + nm + '!! ' : '') + 'くらえーーっ!!'; }
+        var nm = mv ? mv.name.replace(/[(（].*?[)）]/g, '') : ''; return (nm ? (nm.indexOf('大魔王') === 0 ? nm : '大魔王の ' + nm) + '!! ' : '') + 'くらえーーっ!!'; } // 名前が「大魔王〜」ではじまるなら「大魔王の」を足さない
     }
     return e.text;
   }
@@ -180,7 +180,8 @@ var BATTLEUI = (function () {
         if (e.action === 'none') S.wait = DUR.text * speedMul();
         break; }
       case 'act': {
-        setMsg([e.text], true); pop(e.who, ICON[e.kind] || '💬');
+        var atxt = e.text; if (e.kind === 'heal' && e.target && e.target === e.who) { var sc0 = compOf(e.who); if (sc0) atxt = sc0.name + 'は 自分を 回復した(なむなむ) 💚'; }
+        setMsg([atxt], true); pop(e.who, ICON[e.kind] || '💬');
         if (e.kind === 'guardStance') AUDIO.sfx('guard');
         if (e.kind === 'heal') { AUDIO.sfx('heal'); if (e.target === 'all') { for (var id in S.view.comps) { var vc = S.view.comps[id]; if (vc.alive) vc.hp = Math.min(vc.maxHp, vc.hp + Math.floor(vc.maxHp * 0.2)); } } else if (e.target && e.target !== 'hero' && S.view.comps[e.target]) { var v2 = S.view.comps[e.target]; v2.hp = Math.min(v2.maxHp, v2.hp + (e.amount || 0)); dmgFloaterAlly(e.target, e.amount || 0, 'heal'); } }
         if (e.kind === 'self') { var v3 = S.view.comps[e.who]; if (v3) v3.hp = Math.max(0, v3.hp - (e.amount || 0)); dmgFloaterAlly(e.who, e.amount || 0, 'self'); AUDIO.sfx('hurt'); }
@@ -217,9 +218,15 @@ var BATTLEUI = (function () {
         if (e.kind === 'self' && e.text) setMsg([e.text, fmtNum(e.amount) + ' の ダメージ'], false); else setMsg([allyLine(e)], false);
         break; }
       case 'group': case 'bigdmg': {
-        var guardN = 0, isBig = e.type === 'bigdmg';
+        var guardN = 0, isBig = e.type === 'bigdmg', sumA = 0, cntA = 0, lastA = null;
         if (isBig) { flash([255, 255, 255], 0.8, 0.25); shake(14, 0.6); AUDIO.sfx('bighit'); guardN = S.st.guardCount || 0; } else { shake(6, 0.3); AUDIO.sfx('hurt'); }
-        e.hits.forEach(function (h) { applyDamageView(h); dmgFloaterAlly(h.target, h.amount, h.kind === 'miss' ? 'miss' : (isBig && guardN > 0 ? 'guarded' : h.kind)); rowShake(h.target); });
+        e.hits.forEach(function (h) {
+          applyDamageView(h); rowShake(h.target);
+          if (h.target === 'hero') dmgFloaterAlly(h.target, h.amount, h.kind === 'miss' ? 'miss' : (isBig && guardN > 0 ? 'guarded' : h.kind));
+          else if (h.kind !== 'miss') { sumA += h.amount; cntA++; lastA = h; }
+        });
+        if (cntA >= 2) floater({ x: 195, y: 298, text: 'みんなに 合計 ' + fmtNum(sumA), size: isBig ? 30 : 24, grow: isBig ? 30 : 24, color: isBig ? '#ffe066' : '#ffb3b3', stroke: PAL.ink, rise: 18, dur: 1.7 }); // 10人分の数字が 重ならないよう 1つだけ
+        else if (cntA === 1) dmgFloaterAlly(lastA.target, lastA.amount, lastA.kind);
         if (isBig) setMsg([guardN > 0 ? '🛡️ 守りの かまえで ダメージが へった!' : 'みんなに 大ダメージ!!'], false); else setMsg(['みんなに ダメージ!'], false);
         break; }
       case 'compgroup': {
@@ -230,11 +237,12 @@ var BATTLEUI = (function () {
       case 'heal': {
         if (e.target === 'hero') { S.view.heroHp = Math.min(S.view.heroMax, S.view.heroHp + e.amount); dmgFloaterAlly('hero', e.amount, 'heal'); setMsg(['へっぽこの HPが ' + fmtNum(e.amount) + ' 回復!'], false); AUDIO.sfx('heal'); }
         else if (e.target === 'boss') { S.view.bossHp = Math.min(S.view.bossMax, S.view.bossHp + e.amount); floater({ x: BOSS_CX, y: BOSS_CY, text: '+' + fmtBig(e.amount), size: 30, grow: 30, color: '#9df29d', stroke: PAL.ink, rise: 40, dur: 0.9 }); setMsg(['大魔王の HPが ' + fmtBig(e.amount) + ' 回復した…'], false); AUDIO.sfx('heal'); }
-        else { var pct = parseFloat(e.amount) || 0; for (var cid in S.view.comps) { var vv = S.view.comps[cid]; if (vv.alive) { vv.hp = Math.min(vv.maxHp, vv.hp + Math.floor(vv.maxHp * pct / 100)); dmgFloaterAlly(cid, Math.floor(vv.maxHp * pct / 100), 'heal'); } } setMsg(['みんなの HPが 回復した!'], false); AUDIO.sfx('heal'); }
+        else { var pct = parseFloat(e.amount) || 0; for (var cid in S.view.comps) { var vv = S.view.comps[cid]; if (vv.alive) vv.hp = Math.min(vv.maxHp, vv.hp + Math.floor(vv.maxHp * pct / 100)); } floater({ x: 195, y: 298, text: 'みんな 回復!', size: 24, grow: 24, color: '#9df29d', stroke: PAL.ink, rise: 18, dur: 1.2 }); setMsg(['みんなの HPが 回復した!'], false); AUDIO.sfx('heal'); }
         break; }
       case 'mood': {
         S.view.mood = e.mood; S.moodPop = 0.5;
-        if (e.text) { setMsg([e.text], true); if (e.mood === 'laugh') AUDIO.sfx('laugh'); else if (e.mood === 'angry') AUDIO.sfx('hurt'); else if (e.mood === 'charge') AUDIO.sfx('warn'); else AUDIO.sfx('talk'); }
+        if (e.text) { var mtx = e.text, alt = { boast: 'brag', taunt: 'taunt', cry: 'cry', asleep: 'sleep' }[e.mood]; if (alt && Math.random() < 0.5) { var mvv = moveText(alt); if (mvv) mtx = mvv.text; } // 大魔王の ほかのセリフも ときどき
+          setMsg([mtx], true); if (e.mood === 'laugh') AUDIO.sfx('laugh'); else if (e.mood === 'angry') AUDIO.sfx('hurt'); else if (e.mood === 'charge') AUDIO.sfx('warn'); else AUDIO.sfx('talk'); }
         else S.wait = 0.25 * speedMul();
         break; }
       case 'phase': {
@@ -265,7 +273,7 @@ var BATTLEUI = (function () {
     try { localStorage.removeItem('heppoko.battle'); } catch (e) {}
     if (window.P) { P.discovered = P.discovered || {}; for (var k in S.st.discovered) P.discovered[k] = true; }
     G.lastBattle = { turns: S.st.turn, combos: S.st.combos, finisher: S.finisher || 'へっぽこ', won: result === 'win' };
-    hide(S.dom.cmds); hide(S.dom.grid); S.dom.hint.textContent = ''; hide(S.dom.hint);
+    hide(S.dom.cmds); hideGrid(); S.dom.hint.textContent = ''; hide(S.dom.hint);
     var L = window.DATA.BOSS.lines;
     if (result === 'win') {
       S.queue.push({ type: 'win' });
@@ -295,22 +303,42 @@ var BATTLEUI = (function () {
     S.dom.bGuard.classList.toggle('guardglow', !!S.hint.guardGlow);
     S.dom.bGuard.style.transform = S.hint.guardGlow ? 'scale(1.08)' : '';
     show(S.dom.cmds); setCmdsEnabled(true);
-    if (S.gridMode) openGrid(S.gridMode); else hide(S.dom.grid);
+    if (S.gridMode) openGrid(S.gridMode); else hideGrid();
     S.dom.next.style.display = 'none';
   }
   function setCmdsEnabled(on) { [S.dom.bAtk, S.dom.bWeird, S.dom.bGuard].forEach(function (b) { b.disabled = !on; }); }
   function save() {
-    try { localStorage.setItem('heppoko.battle', JSON.stringify({ st: S.st, gridMode: S.gridMode, bigMove: S.bigMove })); } catch (e) {}
+    try { localStorage.setItem('heppoko.battle', JSON.stringify({ st: S.st, gridMode: S.gridMode, bigMove: S.bigMove, sig: (typeof battleSig === 'function') ? battleSig() : '' })); } catch (e) {}
   }
   function choose(cmd) {
     if (!S || S.mode !== 'wait') return false;
-    S.mode = 'play'; setCmdsEnabled(false); hide(S.dom.grid); hideBubble();
+    S.mode = 'play'; setCmdsEnabled(false); hideGrid(); hideBubble();
     S.dom.hint.textContent = ''; hide(S.dom.hint); S.dom.bGuard.classList.remove('guardglow'); S.dom.bGuard.style.transform = '';
+    var firstTurn = S.st.turn === 1;
     var res = BATTLE.runTurn(S.st, cmd, ITEMSREF(), window.DATA.BOSS, S.rng);
     var ended = res.events.some(function (e) { return e.type === 'end'; });
     if (!ended) save();
-    S.queue = S.queue.concat(prepare(res.events));
+    var evs = withFail(res.events, cmd);
+    if (cmd.kind === 'attack') { // 攻撃にならない そうびで たたくときの 笑える一行
+      var ft = evs.filter(function (e) { return e.type === 'text' && e.who === 'hero' && e.item === cmd.itemId; })[0], fit = ITEMSREF()[cmd.itemId];
+      if (ft && fit && !fit.attack) ft.text = nonAtkText(fit);
+    }
+    if (firstTurn && S.st.hero.items.indexOf('kotatsu') >= 0 && cmd.kind !== 'guard') evs.unshift({ type: 'text', text: 'へっぽこは こたつから 出られない… でも 手だけ 出して たたかう!' });
+    S.queue = S.queue.concat(prepare(evs));
     return true;
+  }
+  /* 無駄コマンドが 何も起こさなかったターンの最後に、そのコマンドの「失敗の一言」(DATA.COMMANDS の fail)を 1 行足す */
+  function withFail(evs, cmd) {
+    if (cmd.kind !== 'waste' || !evs.length) return evs;
+    var c = (window.DATA.COMMANDS || []).filter(function (x) { return x.id === cmd.id; })[0];
+    if (!c || !c.fail || !c.fail.length || evs[0].type !== 'text' || !evs[0].cmd) return evs;
+    var k = 1; while (k < evs.length && evs[k].type === 'text') k++;
+    if (k > 2) return evs; // 効果の文が 2 つ以上あるとき(攻撃が はげしくなった 等)は そのまま
+    if (k === 2 && /攻撃が|守りが|ママ/.test(evs[1].text || '')) return evs;
+    var nx = evs[k]; // 次が 効果(気分・回復・ダメージ)なら 何か起きているので 足さない
+    if (nx && (nx.type === 'mood' || nx.type === 'heal' || (nx.type === 'damage' && (nx.who === 'hero' || nx.kind === 'self')))) return evs;
+    var out = evs.slice(); out.splice(k, 0, { type: 'text', text: c.fail[Math.floor(Math.random() * c.fail.length)] });
+    return out;
   }
 
   /* ---------- 一覧(グリッド) ---------- */
@@ -327,56 +355,80 @@ var BATTLEUI = (function () {
     b.addEventListener('click', function (ev) { ev.stopPropagation(); if (lp) { lp = false; return; } if (b.disabled) return; AUDIO.sfx('tap'); onPick(); });
     return b;
   }
-  function showBubble(text) { if (!text) return; S.dom.bubble.textContent = text; show(S.dom.bubble); }
+  function hideGrid() { if (!S || !S.dom) return; hide(S.dom.grid); S.dom.root.classList.remove('gridopen'); }
+  function showBubble(text) { if (!text) return; S.dom.bubble.style.top = S.dom.root.classList.contains('gridopen') ? '432px' : '572px'; S.dom.bubble.textContent = text; show(S.dom.bubble); }
   function hideBubble() { if (S && S.dom) hide(S.dom.bubble); }
+  // 「たたかう」の一覧に出す、攻撃にならない そうびの ひとこと(押すと「ふつうに たたく」。効果は 小さい)
+  function nonAtkText(it) {
+    var n = it.name;
+    var a = ['へっぽこは ' + n + 'を かまえた! …たたく ための ものじゃ ないけど、ぺちっ。', 'へっぽこは ' + n + 'で ふつうに たたいた! …ふつうに。', n + 'を ぶんぶん ふりまわした! 大魔王は ちょっと 目で おった。'];
+    if (it.def > 0) a = ['へっぽこは ' + n + 'を かまえた! まもりが ちょっと 上がった… 気がする。ぺちっ。', n + 'を かざして ポーズ! かっこいい… かもしれない。ぺちっ。'];
+    return a[Math.floor(Math.random() * a.length)];
+  }
+  var KEY_MOODS = ['angry', 'boast', 'cry', 'sleepy', 'taunt', 'hungry', 'lonely', 'laugh']; // 気分に効く ことば 8つ(BATTLE.BEST の順)
   function openGrid(mode) {
     var g = S.dom.grid; g.innerHTML = ''; S.gridMode = mode;
     var glow = (S.hint && S.hint.glow) || [], moodName = (BATTLE.MOODS[S.st.boss.mood] || {}).name || '';
+    function closeRow(bottom) { // 「とじる」は 一覧の先頭にも出す(スクロールしなくても閉じられる)
+      var close = el('button', 'small closer', '▲ とじる'); close.type = 'button';
+      close.addEventListener('click', function (ev) { ev.stopPropagation(); AUDIO.sfx('cancel'); hideGrid(); S.gridMode = null; });
+      g.appendChild(close);
+    }
+    function section(label) { var d = el('div', 'sec', label); g.appendChild(d); }
+    closeRow();
     if (mode === 'attack') {
-      var items = ITEMSREF(), list = S.st.hero.items.filter(function (id) { return items[id] && items[id].attack; });
-      if (!list.length) list = [];
+      var items = ITEMSREF(), eq = S.st.hero.items.filter(function (id) { return items[id]; });
+      var list = eq.filter(function (id) { return items[id].attack; }), others = eq.filter(function (id) { return !items[id].attack; });
       list.forEach(function (id) {
         var it = items[id], heal = it.attack.type === 'heal';
         g.appendChild(gridButton((it.look && it.look.emoji) || '⚔️', it.name, heal ? '回復' : it.attack.name, '#ffd9a0', it.attack.name + ': ' + (it.desc || ''), function () { choose({ kind: 'attack', itemId: id }); }));
       });
       if (!list.length) { var none = el('div', '', 'こうげきできる そうびが ない!'); none.style.cssText = 'grid-column:1/-1;color:#fff;font-weight:800;text-align:center;padding:10px'; g.appendChild(none); }
+      if (others.length) {
+        section('こうげき用じゃない そうび(ふつうに たたく)');
+        others.forEach(function (id) { var it = items[id]; g.appendChild(gridButton((it.look && it.look.emoji) || '🎽', it.name, 'ふつうに たたく', '#e6dcc8', (it.desc || '') + '(こうげき用じゃ ないので 小さく ぺちっ)', function () { choose({ kind: 'attack', itemId: id }); })); });
+      }
     } else {
       var used = {}; for (var key in S.st.comboUsed) used[key.split(':')[1]] = true;
-      (window.DATA.COMMANDS || []).forEach(function (c) {
+      var all = window.DATA.COMMANDS || [], keyIds = KEY_MOODS.map(function (m) { return BATTLE.BEST[m]; });
+      function add(c) {
         var isGlow = glow.indexOf(c.id) >= 0, mamaGone = c.id === 'mama' && S.st.hero.mamaUsed;
         var b = gridButton(CMD_EMOJI[c.id] || '🤪', c.name, isGlow ? moodName + 'に きく' : (mamaGone ? 'もう来ない' : null), '#ffc6ea', c.desc, function () { choose({ kind: 'waste', id: c.id, name: c.name, text: c.text }); });
         if (isGlow) b.classList.add('glow');
         if (used[c.id]) b.appendChild(el('span', 'chk', '✓'));
         if (mamaGone) b.disabled = true;
         g.appendChild(b);
-      });
+      }
+      keyIds.forEach(function (id) { all.forEach(function (c) { if (c.id === id) add(c); }); }); // 気分に効く 8つを先頭に
+      section('そのほか');
+      all.forEach(function (c) { if (keyIds.indexOf(c.id) < 0) add(c); });
     }
-    var close = el('button', 'small', '▲ とじる'); close.type = 'button'; close.style.cssText = 'grid-column:1/-1;background:#d9d4e8;min-height:48px';
-    close.addEventListener('click', function (ev) { ev.stopPropagation(); AUDIO.sfx('cancel'); hide(g); S.gridMode = null; });
-    g.appendChild(close);
-    show(g); g.scrollTop = 0;
+    var bot = el('button', 'small closer', '▲ とじる'); bot.type = 'button';
+    bot.addEventListener('click', function (ev) { ev.stopPropagation(); AUDIO.sfx('cancel'); hideGrid(); S.gridMode = null; });
+    g.appendChild(bot);
+    S.dom.root.classList.add('gridopen'); show(g); g.scrollTop = 0;
   }
   var CMD_EMOJI = { talk: '💬', tsukkomi: '👉', soothe: '🫳', janken: '✊', ignore: '🙈', dajare: '🥶', tea: '🍵', glare: '👀', sorry: '🙇', flee: '🏃', fake: '🤺', cry: '😭', boast: '💰', money: '💴', praise: '👏', sleep: '😴', dance: '💃', sing: '🎤', hungry: '🍽️', pray: '🙏', photo: '🤳', pout: '😤', mama: '👩', play_dead: '🫠', tickle: '🫦', hug: '🤗', count: '🔢', space_out: '☁️', homework_cmd: '📓', onigiri: '🍙', greet: '👋', mimic: '🎭', riddle_cmd: '❓', lecture: '📢', toilet: '🚽', sneeze: '🤧' };
 
   /* ---------- DOM を作る ---------- */
   function buildDom() {
     var root = el('div'); root.id = 'battle'; root.style.pointerEvents = 'none'; // 子だけ押せる(canvas のタップを通す)
-    var hint = el('div', 'hint hidden'); hint.style.cssText = 'top:296px;font-size:15px;line-height:1.3;pointer-events:none;background:rgba(27,20,48,.85);border-radius:12px;padding:3px 10px'; // フキダシ型(炎に重なっても読める)
+    var hint = el('div', 'hint hidden'); hint.style.cssText = 'top:296px;font-size:16px;line-height:1.3;pointer-events:none;background:rgba(27,20,48,.85);border-radius:12px;padding:3px 10px'; // フキダシ型(炎に重なっても読める)
     var msg = el('div', 'msg'); msg.style.pointerEvents = 'auto';
     var body = el('div', 'body'); var next = el('div', 'next', '▼'); msg.appendChild(body); msg.appendChild(next);
     msg.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); onTap(); });
     var cmds = el('div', 'cmds'); cmds.style.pointerEvents = 'auto';
     function bigBtn(emoji, label, cls, fn) {
       var b = btn('<span class="e" style="font-size:24px;line-height:1">' + emoji + '</span><span>' + label + '</span>', cls, fn);
-      b.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:15px;padding:0 2px;line-height:1.15';
+      b.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:18px;padding:0 2px;line-height:1.15;white-space:nowrap;letter-spacing:-1px';
       return b;
     }
-    var bAtk = bigBtn('⚔️', 'たたかう', 'orange', function () { if (S.mode !== 'wait') return; if (S.gridMode === 'attack') { hide(S.dom.grid); S.gridMode = null; } else openGrid('attack'); });
-    var bWeird = bigBtn('🤪', 'へんなこと', 'pink', function () { if (S.mode !== 'wait') return; if (S.gridMode === 'weird') { hide(S.dom.grid); S.gridMode = null; } else openGrid('weird'); });
+    var bAtk = bigBtn('⚔️', 'たたかう', 'orange', function () { if (S.mode !== 'wait') return; if (S.gridMode === 'attack') { hideGrid(); S.gridMode = null; } else openGrid('attack'); });
+    var bWeird = bigBtn('🤪', 'へんなこと', 'pink', function () { if (S.mode !== 'wait') return; if (S.gridMode === 'weird') { hideGrid(); S.gridMode = null; } else openGrid('weird'); });
     var bGuard = bigBtn('🛡️', 'まもる', 'sky', function () { if (S.mode !== 'wait') return; AUDIO.sfx('guard'); choose({ kind: 'guard' }); });
     var bSpd = btn('', 'spd', function () { SETTINGS.speed = SETTINGS.speed >= 3 ? 1 : SETTINGS.speed + 1; saveSettings(); spdLabel(); });
     bSpd.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;line-height:1.1';
-    function spdLabel() { bSpd.innerHTML = '<span style="font-size:18px">⏩</span><span>' + ['', '手動', 'ふつう', 'はやい'][SETTINGS.speed] + '</span>'; }
+    function spdLabel() { bSpd.innerHTML = '<span style="font-size:14px">⏩ 文字</span><span style="font-size:16px">' + ['', '手動', '自動', 'はやい'][SETTINGS.speed] + '</span>'; } // 何の「ふつう」か 分かるように「文字:」を付ける
     spdLabel();
     cmds.appendChild(bAtk); cmds.appendChild(bWeird); cmds.appendChild(bGuard); cmds.appendChild(bSpd);
     var grid = el('div', 'grid hidden'); grid.style.pointerEvents = 'auto';
@@ -407,6 +459,7 @@ var BATTLEUI = (function () {
     enter: function () {
       S = fresh();
       var saved = null; try { saved = JSON.parse(localStorage.getItem('heppoko.battle') || 'null'); } catch (e) { saved = null; }
+      if (saved && typeof battleSig === 'function' && saved.sig !== battleSig()) { saved = null; try { localStorage.removeItem('heppoko.battle'); } catch (e) {} } // 装備・仲間がちがう古いデータは使わない
       if (saved && saved.st && saved.st.boss && saved.st.hero) { S.st = saved.st; S.gridMode = saved.gridMode || null; S.bigMove = saved.bigMove || null; S.resumed = true; }
       else S.st = BATTLE.newState(heroSt(), ids(), comps(), window.DATA.BOSS);
       S.rng = BATTLE.makeRng(Date.now());
@@ -415,7 +468,12 @@ var BATTLEUI = (function () {
       if (window.HUD && HUD.hide) HUD.hide();
       AUDIO.bgm('battle');
       if (S.resumed) goWait();
-      else { S.mode = 'play'; (window.DATA.BOSS.lines.intro || []).forEach(function (t) { S.queue.push({ type: 'say', text: t }); }); S.queue.push({ type: 'turn', hint: null }); }
+      else {
+        S.mode = 'play'; (window.DATA.BOSS.lines.intro || []).forEach(function (t) { S.queue.push({ type: 'say', text: t }); });
+        var heq = S.st.hero.items, ex = heq.indexOf('granny_dentures') >= 0 ? '大魔王「…まて。なんだ その 歯は!」' : heq.indexOf('kotatsu') >= 0 ? '大魔王「こたつ…? なんで こたつ…?」' : heq.indexOf('gold_poop') >= 0 ? '大魔王は 金のうんちから そっと 目を そらした。(見ないふりを した)' : null; // 装備しだいで 一言
+        if (ex) S.queue.push({ type: 'say', text: ex });
+        S.queue.push({ type: 'turn', hint: null });
+      }
     },
     leave: function () {
       if (S && S.dom && S.dom.root.parentNode) S.dom.root.parentNode.removeChild(S.dom.root);
@@ -443,7 +501,11 @@ var BATTLEUI = (function () {
       // HP の数字は 0.6 秒で追いつく(層がはがれたら演出)
       var before = layersOf(S.shownBossHp);
       S.shownBossHp = Math.abs(S.view.bossHp - S.shownBossHp) < 1 ? S.view.bossHp : lerp(S.shownBossHp, S.view.bossHp, 1 - Math.pow(0.002, dt / 0.6));
-      if (layersOf(S.shownBossHp) < before) peel();
+      var nowL = layersOf(S.shownBossHp);
+      if (nowL < before) {
+        peel();
+        if (nowL === 1 && !S.sawLast && S.mode !== 'over') { S.sawLast = true; S.queue.unshift({ type: 'say', text: 'へっぽこ「…だめです。」' }); S.queue.unshift({ type: 'say', text: '大魔王「ま、まて。ちょっと トイレに 行っていいか?」' }); } // あと 1 層の ひとこと
+      }
       S.shownHeroHp = Math.abs(S.view.heroHp - S.shownHeroHp) < 0.5 ? S.view.heroHp : lerp(S.shownHeroHp, S.view.heroHp, 1 - Math.pow(0.01, dt / 0.3));
       // ピンチの曲
       var pinch = S.view.heroHp <= S.view.heroMax * 0.25 && S.mode !== 'over';
@@ -524,7 +586,7 @@ var BATTLEUI = (function () {
     if (S.view.mood === 'charge') edge = Math.floor(G.t * 6) % 2 ? '#ffe066' : '#fff';
     rrect(bx, by, bw, bh, 8, null, edge, k === 1 || S.view.mood === 'charge' ? 3 : 2);
     if (S.barFlash > 0) rrect(bx, by, bw, bh, 8, 'rgba(255,255,255,' + (S.barFlash / 0.15 * 0.9).toFixed(2) + ')');
-    txt('あと ' + k + ' 層', bx + 4, by + bh + 1, 12, '#ffe9b3', 'left', 800, null);
+    txt('あと ' + k + ' 層', bx + 4, by + bh + 9, 15, '#ffe9b3', 'left', 800, null);
   }
   function hpColor(p) { return p > 0.5 ? '#2e7d32' : p > 0.25 ? '#f9a825' : '#c62828'; }
   function drawAllies() {
@@ -547,7 +609,7 @@ var BATTLEUI = (function () {
       if (!v.alive) { ATL.draw('😵', x + dx, COMP_Y, 26, 0.55); }
       else {
         ATL.draw(c.emoji, x + dx, COMP_Y, 28 * sc);
-        if (v.count >= 2) { var n = Math.max(1, Math.ceil(v.count * v.hp / v.maxHp)); txt(n >= 1000 ? Math.floor(n / 1000) + 'k' : String(n), x + 14, COMP_Y + 10, 12, '#ffe066', 'right', 900, PAL.ink); }
+        if (v.count >= 2) { var n = Math.max(1, Math.ceil(v.count * v.hp / v.maxHp)); txt(n >= 1000 ? Math.floor(n / 1000) + 'k' : String(n), x + 15, COMP_Y + 10, 15, '#ffe066', 'right', 900, PAL.ink); }
       }
       if (pp) ATL.draw(pp.icon, x + 13, COMP_Y - 17, 20);
       // HP の点

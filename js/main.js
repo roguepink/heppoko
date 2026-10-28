@@ -66,7 +66,7 @@ var DIALOG = (function () {
   var lines = [], idx = 0, full = '', shownN = 0, timer = null, doneAt = 0, cb = null, active = false, choosing = false;
   function speedMs() { return [0, 40, 25, 10][SETTINGS.textSpeed || 2]; }
   function start(w, ls, done) {
-    lines = ls.slice(); idx = 0; cb = done || null; active = true; choosing = false; hide(choices); choices.innerHTML = '';
+    lines = ls.slice(); idx = 0; cb = done || null; active = true; choosing = false; node.classList.remove('danger'); hide(choices); choices.innerHTML = '';
     who.innerHTML = w ? '<span class="face">' + esc(w.emoji || '') + '</span>' + esc(w.name || '') : ''; who.style.display = w ? 'flex' : 'none';
     show(node); showLine();
   }
@@ -85,7 +85,7 @@ var DIALOG = (function () {
     return true;
   }
   function askChoices(w, text, list) {
-    lines = [text]; idx = 0; active = true; choosing = true; cb = null;
+    lines = [text]; idx = 0; active = true; choosing = true; cb = null; node.classList.remove('danger');
     who.innerHTML = w ? '<span class="face">' + esc(w.emoji || '') + '</span>' + esc(w.name || '') : ''; who.style.display = w ? 'flex' : 'none';
     show(node); hide(next); choices.innerHTML = ''; choices.className = 'choices hidden' + (list.length === 2 ? ' two' : ''); // 文が出おわるまで ボタンは隠す
     list.forEach(function (c) { var b = btn(c.label, c.cls || '', function () { active = false; choosing = false; hide(node); hide(choices); c.fn && c.fn(); }); if (c.disabled) b.disabled = true; choices.appendChild(b); });
@@ -112,7 +112,15 @@ function openSettings() {
   ui.appendChild(shade); ui.appendChild(box);
 }
 
-function battleInProgress() { try { var b = JSON.parse(localStorage.getItem('heppoko.battle') || 'null'); return !!(b && b.st && b.st.boss && b.st.hero); } catch (e) { return false; } }
+/* 戦闘の途中データ('heppoko.battle')は、装備と仲間の「署名」つきで保存する。いまの装備・仲間とちがえば古いデータなので捨てる */
+function battleSig() { return SLOTS.map(function (s) { return (P && P.equip[s]) || ''; }).join(',') + '|' + (P ? P.party.join(',') : ''); }
+function dropBattleSave() { try { localStorage.removeItem('heppoko.battle'); } catch (e) {} }
+function battleInProgress() { // つづけてよい途中データがあるか(装備・仲間がちがう古いデータは、ここで捨てる)
+  var b = null; try { b = JSON.parse(localStorage.getItem('heppoko.battle') || 'null'); } catch (e) { b = null; }
+  if (!b || !b.st || !b.st.boss || !b.st.hero) return false;
+  if (!P || b.sig !== battleSig()) { dropBattleSave(); return false; }
+  return true;
+}
 /* ---------- タイトル ---------- */
 SCENES.title = {
   enter: function () {
@@ -129,7 +137,7 @@ SCENES.title = {
     tools.appendChild(mute); tools.appendChild(font); t.appendChild(tools);
     t.appendChild(el('div', 'copy', '©2026 ROGUE PINK'));
     ui.appendChild(t); this.stars = []; for (var i = 0; i < 14; i++) this.stars.push({ x: rnd(10, 380), y: rnd(20, 760), p: rnd(0, 6) });
-    function startNew() { clearSave(); P = newPlayer(); go('opening'); } // 古いセーブは消す(「つづきから」に前のデータが残らないように)
+    function startNew() { clearSave(); dropBattleSave(); P = newPlayer(); go('opening'); } // 古いセーブは消す(「つづきから」に前のデータが残らないように)
   },
   leave: function () { if (this.node) this.node.remove(); },
   draw: function () {
@@ -157,12 +165,26 @@ SCENES.opening = {
 SCENES.confirmBoss = {
   enter: function () {
     var self = this; HUD.show();
-    var st = heroStats(), n = P.party.length, warn = [];
-    if (n < 10) warn.push('仲間は ' + n + '組(10組まで)'); if (st.def < 100) warn.push('守りが 弱め'); if (st.hp < 600) warn.push('HP が 少なめ');
+    var st = heroStats(), n = P.party.length, warn = [], rc = roleCounts(), danger = false;
+    if (rc.guard === 0) { warn.push('🛡️ まもり役が いない(大技で あぶない!)'); danger = true; }
+    if (rc.heal === 0) { warn.push('💚 かいふく役が いない'); danger = true; }
+    if (n < 6) { warn.push('仲間が 6組より 少ない(いま ' + n + '組)'); danger = true; } else if (n < 10) warn.push('仲間は ' + n + '組(10組まで)');
+    if (st.def < 100) warn.push('守りが 弱め'); if (st.hp < 600) warn.push('HP が 少なめ');
+    function goBattle(keep) { autosave(); if (!keep) dropBattleSave(); go('battle'); } // 新しい戦いは 古い途中保存を使わない
+    function askGo() {
+      ask({ name: 'へっぽこ', emoji: '🤴' }, 'いま: 攻 ' + st.atk + ' 守 ' + st.def + ' HP ' + st.hp + ' / 仲間 ' + n + '組' + (warn.length ? '\n⚠ ' + warn.join('\n⚠ ') : '\nじゅんびは ばっちり!') + '\n大魔王の ところへ 行く?', [
+        { label: danger ? '⚔️ それでも いく!' : '⚔️ いく!', cls: 'orange', fn: function () { goBattle(false); } },
+        danger ? { label: '👥 なかまを 見なおす', cls: 'leaf', fn: function () { go('town', { from: 'exit' }); setTimeout(function () { pushScene('party'); }, 60); } } : null,
+        { label: 'まだ やめておく', cls: 'gray', fn: function () { go('town', { from: 'exit' }); } }].filter(Boolean));
+      if (danger) DIALOG.node.classList.add('danger'); // 赤い枠で目立たせる
+    }
     say(null, DATA.TEXTS.beforeBoss.slice(0, 2), function () {
-      ask({ name: 'へっぽこ', emoji: '🤴' }, 'いま: 攻 ' + st.atk + ' 守 ' + st.def + ' HP ' + st.hp + ' / 仲間 ' + n + '組' + (warn.length ? '\n⚠ ' + warn.join('・') : '\nじゅんびは ばっちり!') + '\n大魔王の ところへ 行く?', [
-        { label: '⚔️ いく!', cls: 'orange', fn: function () { autosave(); try { localStorage.removeItem('heppoko.battle'); } catch (e) {} go('battle'); } }, // 新しい戦い(古い途中保存は使わない)
-        { label: 'まだ やめておく', cls: 'gray', fn: function () { go('town', { from: 'exit' }); } }]);
+      if (battleInProgress()) { // 前の戦いの途中データが、いまの装備・仲間と同じなら つづきを聞く
+        ask({ name: 'へっぽこ', emoji: '🤴' }, '前の 戦いの つづきが あるよ。\nつづきから する?', [
+          { label: '▶ つづきから', cls: 'orange', fn: function () { goBattle(true); } },
+          { label: '🔄 最初から', cls: 'sky', fn: function () { dropBattleSave(); askGo(); } },
+          { label: 'まだ やめておく', cls: 'gray', fn: function () { go('town', { from: 'exit' }); } }]);
+      } else askGo();
     });
   },
   tap: function () { DIALOG.tap(); },

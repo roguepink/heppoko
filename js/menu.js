@@ -4,10 +4,23 @@ function panel(title, sub, full) {
   var pn = el('div', 'panel' + (full ? ' full' : '')); var head = el('div', 'head', '<h2>' + title + '</h2>' + (sub ? '<div class="sub">' + esc(sub) + '</div>' : ''));
   pn.appendChild(head); var x = btn('×', 'xbtn', function () { popScene(); }); pn.appendChild(x); ui.appendChild(pn); return pn;
 }
+/* ---------- 仲間の役割の数(なかま画面・出発の確認・町の下の帯で使う) ---------- */
+var ROLE_LIST = [['attack', '⚔️', 'こうげき'], ['guard', '🛡️', 'まもり'], ['heal', '💚', 'かいふく'], ['support', '🎵', 'おうえん'], ['weird', '🎲', 'へんな']];
+function roleCounts() {
+  var r = { attack: 0, guard: 0, heal: 0, support: 0, weird: 0 };
+  P.party.forEach(function (id) { var c = COMPS[id]; if (c && c.battle && r[c.battle.role] !== undefined) r[c.battle.role]++; });
+  return r;
+}
 function statDiff(item, slot) { // いまの装備との差
   var cur = P.equip[slot] ? ITEMS[P.equip[slot]] : null, da = (item ? item.atk : 0) - (cur ? cur.atk : 0), dd = (item ? item.def : 0) - (cur ? cur.def : 0), dh = (item ? item.extra.hp : 0) - (cur ? cur.extra.hp : 0);
   var s = []; if (da) s.push((da > 0 ? '<span class="up">▲攻+' + da : '<span class="dn">▼攻' + da) + '</span>'); if (dd) s.push((dd > 0 ? '<span class="up">▲守+' + dd : '<span class="dn">▼守' + dd) + '</span>'); if (dh) s.push((dh > 0 ? '<span class="up">▲HP+' + dh : '<span class="dn">▼HP' + dh) + '</span>');
   return s.join(' ') || '<span style="opacity:.6">かわらない</span>';
+}
+function diffText(item) { // 買う確認窓用: いまの装備との差(文字だけ)
+  var cur = P.equip[item.slot] ? ITEMS[P.equip[item.slot]] : null, da = item.atk - (cur ? cur.atk : 0), dd = item.def - (cur ? cur.def : 0), dh = (item.extra.hp || 0) - (cur ? (cur.extra.hp || 0) : 0);
+  function f(lab, d) { return (d > 0 ? '▲' : '▼') + lab + (d > 0 ? '+' : '−') + Math.abs(d); }
+  var s = []; if (da) s.push(f('攻', da)); if (dd) s.push(f('守', dd)); if (dh) s.push(f('HP', dh));
+  return (cur ? 'いまの ' + cur.name + ' より' : 'いまは なにも つけていない') + '\n' + (s.join(' ') || 'かわらない');
 }
 function itemRow(item, right, onTap) {
   var r = el('div', 'row-item'); r.innerHTML = '<div class="e">' + item.look.emoji + '</div><div class="nm">' + esc(item.name) + '<small>' + SLOT_NAME[item.slot] + ' · ' + statDiff(item, item.slot) + '</small></div><div class="pr' + (right.no ? ' no' : '') + '">' + right.text + '</div>';
@@ -19,6 +32,8 @@ function doEquip(item, then) {
 }
 
 /* ---------- 店 ---------- */
+var BUY_ASIDE = { gold_poop: '(うんが つく)' }; // 買う前の ひとこと
+var BUY_AFTER = { gold_poop: 'キラリ「…ほんとに 買う人 はじめて 見た」', legend_sword: 'ゴンゾウ「ねふだは はがしておいたぞ。…あ、まだ ついてた」' }; // 買ったあとの 店主の ひとこと
 function shopScene(shopId) {
   return {
     enter: function () {
@@ -29,7 +44,9 @@ function shopScene(shopId) {
       function refresh() { var st = heroStats(); info.innerHTML = '<span>' + sh.items.length + ' 品</span><span>いま: 攻 ' + st.atk + ' 守 ' + st.def + ' HP ' + st.hp + '</span>'; }
       function build() {
         list.innerHTML = ''; refresh(); sel = null; descEl = null; buy.disabled = true; buy.textContent = 'えらんでね'; // 買ったあと、もう一度「かう」で同じ物を二重に買わない
-        sh.items.map(function (id) { return ITEMS[id]; }).filter(Boolean).sort(function (a, b) { return a.price - b.price; }).forEach(function (it) {
+        var lastSlot = null;
+        sh.items.map(function (id) { return ITEMS[id]; }).filter(Boolean).sort(function (a, b) { return (SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot)) || (a.price - b.price); }).forEach(function (it) {
+          if (it.slot !== lastSlot) { lastSlot = it.slot; list.appendChild(el('div', 'sec', SLOT_EMOJI[it.slot] + ' ' + SLOT_NAME[it.slot])); } // 部位ごとの見出し
           var owned = hasItem(it.id), r = itemRow(it, owned ? { text: 'もってる' } : { text: fmtG(it.price), no: it.price > P.money }, function (row) {
             list.querySelectorAll('.row-item').forEach(function (x) { x.classList.remove('sel'); }); if (descEl) descEl.remove();
             row.classList.add('sel'); sel = it; descEl = el('div', 'desc', esc(it.desc) + (it.attack ? '<br>⚔️ わざ:「' + esc(it.attack.name) + '」' : '')); row.after(descEl);
@@ -41,10 +58,10 @@ function shopScene(shopId) {
         if (!sel) return; var it = sel;
         if (hasItem(it.id)) { buy.disabled = true; buy.textContent = 'もってる'; return; }
         if (it.price > P.money) { say({ name: owner.name, emoji: owner.emoji }, [sh.talk.poor]); return; }
-        confirm(it.look.emoji + ' ' + it.name + ' を ' + fmtG(it.price) + ' で かう?\n(のこり ' + fmtG(P.money - it.price) + ')', 'かう', 'やめる', function (ok) {
+        confirm(it.look.emoji + ' ' + it.name + ' を ' + fmtG(it.price) + ' で かう?' + (BUY_ASIDE[it.id] || '') + '\n' + diffText(it) + '\n(のこり ' + fmtG(P.money - it.price) + ')', 'かう', 'やめる', function (ok) {
           if (!ok) return; pay(it.price); P.items.push(it.id); AUDIO.sfx('buy'); autosave();
           var cur = P.equip[it.slot];
-          ask({ name: owner.name, emoji: owner.emoji }, sh.talk.buy + '\nそのまま そうびする?' + (cur ? '(いまの ' + ITEMS[cur].name + ' と とりかえ)' : ''), [
+          ask({ name: owner.name, emoji: owner.emoji }, (BUY_AFTER[it.id] || sh.talk.buy) + '\nそのまま そうびする?' + (cur ? '(いまの ' + ITEMS[cur].name + ' と とりかえ)' : ''), [
             { label: '🎽 そうびする', cls: 'orange', fn: function () { doEquip(it); build(); } },
             { label: 'あとで', cls: 'gray', fn: function () { build(); } }]);
         }, 'orange');
@@ -78,7 +95,10 @@ SCENES.equip = {
       var back = el('div', 'row-item', '<div class="e">↩</div><div class="nm">もどる</div>'); back.addEventListener('click', function () { AUDIO.sfx('cancel'); build(); }); list.appendChild(back);
       if (P.equip[slot]) { var off = el('div', 'row-item', '<div class="e">🚫</div><div class="nm">はずす</div>'); off.addEventListener('click', function () { P.equip[slot] = null; AUDIO.sfx('ok'); TOWN.refresh(); build(); }); list.appendChild(off); }
       var cands = P.items.filter(function (id) { return ITEMS[id] && ITEMS[id].slot === slot && P.equip[slot] !== id; });
-      if (!cands.length) list.appendChild(el('div', 'desc', 'この部位に つけられる物を 持っていない。お店で 買おう!'));
+      if (!cands.length) {
+        var shops = DATA.SHOPS.filter(function (sh) { return sh.items.some(function (iid) { return ITEMS[iid] && ITEMS[iid].slot === slot; }); }).map(function (sh) { return sh.name.replace(/\(.*\)/, ''); });
+        list.appendChild(el('div', 'desc', 'この部位に つけられる物を 持っていない。お店で 買おう!' + (shops.length ? '<br>「' + SLOT_NAME[slot] + '」は ' + esc(shops.join('・')) + ' で 売っているよ。' : '')));
+      }
       cands.forEach(function (id) { var it = ITEMS[id]; list.appendChild(itemRow(it, { text: it.attack ? '⚔️' : '' }, function () { doEquip(it); build(); })); });
     }
     foot.appendChild(btn('👀 いまの すがたを 見る', 'orange', function () { var st = heroStats(); pushScene('showoff', { itemId: null, before: st, after: st }); }));
@@ -92,10 +112,20 @@ SCENES.party = {
   enter: function () {
     HUD.show(); HUD.setPlace('なかま');
     var pn = panel('👥 なかま', '10組まで。上から 順に ならんで 歩く'); this.pn = pn;
-    var info = el('div', 'info'); pn.appendChild(info); var list = el('div', 'list'); pn.appendChild(list);
+    var info = el('div', 'info'); pn.appendChild(info); var roles = el('div', 'roles'); pn.appendChild(roles); var list = el('div', 'list'); pn.appendChild(list);
     var ROLE = { attack: '⚔️ こうげき', guard: '🛡️ まもり', heal: '💚 かいふく', support: '🎵 おうえん', weird: '🎲 へんな人' };
+    function buildRoles() { // 役割の数と、足りない役の一言(まもり役が 0 だと 大技で全滅しやすい)
+      var rc = roleCounts(), h = '<div class="chips">';
+      ROLE_LIST.forEach(function (r) { h += '<span class="chip' + (rc[r[0]] === 0 && (r[0] === 'guard' || r[0] === 'heal') ? ' zero' : '') + '">' + r[1] + r[2] + '<b>' + rc[r[0]] + '</b></span>'; });
+      h += '</div>';
+      if (P.party.length) {
+        if (!rc.guard) h += '<div class="warnline">🛡️ まもり役が いないと 大魔王の 大技で あぶないよ!</div>';
+        if (!rc.heal) h += '<div class="warnline">💚 かいふく役が いないと けがが なおらなくて つらいよ!</div>';
+      }
+      roles.innerHTML = h; roles.style.display = P.party.length ? '' : 'none';
+    }
     function build() {
-      info.innerHTML = '<span>' + P.party.length + ' / 10 組</span><span>候補は 町に ' + DATA.COMPANIONS.filter(function (c) { return P.party.indexOf(c.id) < 0; }).length + ' 組</span>'; list.innerHTML = '';
+      info.innerHTML = '<span>' + P.party.length + ' / 10 組</span><span>候補は 町に ' + DATA.COMPANIONS.filter(function (c) { return P.party.indexOf(c.id) < 0; }).length + ' 組</span>'; list.innerHTML = ''; buildRoles();
       if (!P.party.length) list.appendChild(el('div', 'desc', 'まだ 仲間が いない。町の 人に 話しかけてみよう。💬 の ふきだしが 出ている人が 仲間に なってくれる人。'));
       P.party.forEach(function (id, i) {
         var c = COMPS[id], r = el('div', 'row-item'); r.innerHTML = '<div class="e">' + c.emoji + '</div><div class="nm">' + esc(c.name) + (c.count > 1 && c.name.indexOf(String(c.count)) < 0 ? ' ×' + c.count : '') + '<small>' + ROLE[c.battle.role] + ' · 力 ' + c.battle.power + ' · HP ' + c.battle.hp + '</small></div>';
@@ -152,16 +182,17 @@ function restAndSave(where) { AUDIO.sfx('heal'); toast('ぐっすり 休んだ�
 
 SCENES.home = roomScene({ title: 'へっぽこの家', emoji: '🏠', sub: '大きな家。ママと パパが いる', scene: '🛋️ 👩 👨 🍽️', color: 'rgba(60,40,30,.97)',
   actions: function () { return [
-    { label: '👩 ママと はなす', fn: function () { talkNpc('mama'); } },
+    { label: '👩 ママと はなす', fn: function () { talkNpc('mama', (P.equip.rhand === 'frying_pan' || P.equip.cape === 'curtain' || P.equip.body === 'curtain') ? ['へっぽこ、その 手に もってるの なに? …フライパン? カーテン? …まあ いいわ。'] : []); } },
     { label: '👨 パパと はなす', fn: function () { if (!P.flags.papaMoney) { P.flags.papaMoney = true; talkNpc('papa'); setTimeout(function () { gain(DATA.TEXTS.money.allowanceFromPapa); AUDIO.sfx('coin'); toast('パパから ' + fmtG(DATA.TEXTS.money.allowanceFromPapa) + ' もらった!'); }, 400); } else talkNpc('papa'); } },
     { label: '🛏️ 休む・セーブ', cls: 'sky', fn: function () { restAndSave(); } }]; } });
 SCENES.castle = roomScene({ title: 'お城', emoji: '🏰', sub: '王さまは ひるね中。お姫さまが いる', scene: '👑 🤴 👸 🪑', color: 'rgba(40,30,70,.97)',
   actions: function () { return [
     { label: '🤴 王さまと はなす', fn: function () {
       if (P.flags.guardAsk && !P.flags.guardTold) { P.flags.guardTold = true; say({ name: '王さま', emoji: '🤴' }, ['兵士が がんばってる? …そうか。', 'わしは 見ていないが、まあ、よく やっているんじゃろう。伝えておけ。']); toast('兵士に 伝えよう'); return; }
+      if (P.wins > 0) { say({ name: '王さま', emoji: '🤴' }, ['おお、大魔王を たおしたそうじゃな! えらい! …わしは 見ていないが。', 'ほうび? …そうじゃな、肩たたき券で どうじゃ。']); return; }
       talkNpc('king'); } },
     { label: '👸 お姫さまと はなす', fn: function () { talkNpc('princess'); } },
-    { label: '💰 おみまい金を もらう', cls: 'sky', fn: function () { if (P.flags.kingGift) { say({ name: '王さま', emoji: '🤴' }, ['もう やったじゃろ。わしは けちじゃ ないが、2回は やらん。']); return; } P.flags.kingGift = true; gain(100000); AUDIO.sfx('coin'); say({ name: '王さま', emoji: '🤴' }, ['ほうびを 先に やろう。10万G じゃ。', 'たおしたら… そうだな… また 考える。']); } }]; } });
+    { label: '💰 お金を おねだり', cls: 'sky', fn: function () { if (P.flags.kingGift) { say({ name: '王さま', emoji: '🤴' }, ['もう やったじゃろ。わしは けちじゃ ないが、2回は やらん。']); return; } P.flags.kingGift = true; gain(100000); AUDIO.sfx('coin'); say({ name: '王さま', emoji: '🤴' }, ['ほうびを 先に やろう。10万G じゃ。', 'たおしたら… そうだな… また 考える。']); } }]; } });
 SCENES.church = roomScene({ title: '教会', emoji: '⛪', sub: 'しずかな場所', scene: '🕯️ ✝️ 🕯️', color: 'rgba(30,30,60,.97)',
   actions: function () { return [
     { label: '🙏 おいのりする', fn: function () { AUDIO.sfx('heal'); say({ name: 'シスター', emoji: '👩‍🦳' }, ['あなたの 旅に 光が ありますように。', '大魔王も、きっと だれかに わかってほしい だけなのかも。…なんて。']); } },
@@ -169,7 +200,7 @@ SCENES.church = roomScene({ title: '教会', emoji: '⛪', sub: 'しずかな場
 SCENES.inn = roomScene({ title: '宿', emoji: '🛏️', sub: 'お金持ちなので いつでも 泊まれる', scene: '🛏️ 🛏️ 🧴', color: 'rgba(60,45,30,.97)',
   actions: function () { return [
     { label: '🛏️ 泊まる(ツケで)・セーブ', cls: 'sky', fn: function () { restAndSave(); say({ name: '宿のおかみ', emoji: '👩‍🍳' }, ['ツケで いいわよ。ママに 請求 しておくから。', 'ゆっくり 休んでね。']); } },
-    { label: '💬 おかみと はなす', fn: function () { say({ name: '宿のおかみ', emoji: '👩‍🍳' }, [pick(['隣の おばさん、むかしは 「おたまの 達人」って よばれてたのよ。', '大魔王って、おなかが すくと 弱いって うわさよ。', 'うちの 宿、大魔王も 泊まったこと あるの。いびきが すごかった。'])]); } }]; } });
+    { label: '💬 おかみと はなす', fn: function () { say({ name: '宿のおかみ', emoji: '👩‍🍳' }, [pick(['隣の おばさん、むかしは 「おたまの 達人」って よばれてたのよ。', '大魔王って、おなかが すくと 弱いって うわさよ。', 'うちの 宿、大魔王も 泊まったこと あるの。いびきが すごかった。', '大魔王の 大技はね、「まもり」の 仲間が いないと 全滅しちゃうのよ。つれて いきなさいね。'])]); } }]; } });
 SCENES.aunt = roomScene({ title: '隣のおばさんの家', emoji: '🏡', sub: 'いい においが する', scene: '🍲 👩‍🦱 🐈', color: 'rgba(60,30,40,.97)',
   actions: function () { return [{ label: '👩‍🦱 おばさんと はなす', cls: 'leaf', fn: function () { RECRUIT.start(COMPS.aunt, function (joined) { if (joined) TOWN.refresh(); }); } }]; } });
 
@@ -196,6 +227,14 @@ var RECRUIT = (function () {
   function start(c, then) {
     var who = { name: c.name, emoji: c.emoji }, h = c.how;
     // 特別な役(お使いの相手)
+    if (c.id === 'aunt' && !P.flags.kairanbanDone && P.party.indexOf('baker') >= 0) { // パン屋さんを先に仲間にしていても、回覧板は「うしろにいる」で通す
+      P.flags.kairanban = true; P.flags.kairanbanDone = true;
+      say(who, ['回覧板? パン屋さんに… あら、もう あなたの うしろに いるじゃない。', 'じゃあ とどけたことに しておくわ。(ちょっと うれしそう)'], function () { join(c, then); }); return;
+    }
+    if (c.id === 'bees' && !P.flags.bouquet && P.party.indexOf('florist') >= 0) { // お花屋さんが うしろにいれば、花束を わけてもらったことにする
+      P.flags.bouquet = true;
+      say(who, ['ブーン?(あ、お花屋さんが うしろに いる! 花束を わけてもらった 💐)', 'ブーン♪ (ついていく!)'], function () { join(c, then); }); return;
+    }
     if (c.id === 'baker' && P.flags.kairanban && !P.flags.kairanbanDone) { P.flags.kairanbanDone = true; say(who, ['あ、回覧板! ありがとう。おばさんに よろしくね。', 'おれいに パンを 1つ。(🥐 を もらった。気分が いい)'], function () { then && then(false); }); return; }
     if (c.id === 'florist' && !P.flags.bouquet && (P.talked.bees || 0) > 0) { P.flags.bouquet = true; say(who, ['ミツバチさんに 花束? いいわよ、はい どうぞ。💐', 'わたしも つれていってね!']); then && then(false); return; }
     var before = c.talk.before || [];
