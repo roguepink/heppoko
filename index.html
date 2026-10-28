@@ -3,11 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#1b2a4a">
+<meta name="theme-color" content="#140c2a">
 <title>勇者へっぽこの小さな冒険</title>
 <meta name="description" content="隣町に大魔王が現れた!お金持ちの子・へっぽこが、お金の力で武器と仲間をそろえて、ただ一度の大決戦へ。笑って泣ける小さなRPG。">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="へっぽこ">
@@ -20,129 +21,157 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <style>
-  :root { color-scheme: dark; }
+  :root { color-scheme: dark; --ink:#1b1430; --night:#140c2a; --cream:#fffaf0; --sun:#ffe066; --orange:#ffb347; --sky:#7fe0ff; --leaf:#9df29d; --pink:#ff7ad0; --red:#ff6a6a; --violet:#8a2be2;
+    --fs:20px; --fs2:17px; --fsb:18px; }
+  html[data-font="big"] { --fs:24px; --fs2:20px; --fsb:20px; }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #1b2a4a; color: #fff;
-    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", "Noto Sans JP", system-ui, sans-serif; }
-  canvas { position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
-  .overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 16px; text-align: center; padding: env(safe-area-inset-top) 24px env(safe-area-inset-bottom); background: rgba(10, 6, 24, .72); }
-  .overlay.hidden { display: none; }
-  h1 { margin: 0; font-size: clamp(28px, 8vw, 48px); font-weight: 900; line-height: 1.25; }
-  p { margin: 0; line-height: 1.7; }
-  button { font: inherit; font-weight: 800; font-size: 20px; padding: 14px 36px; border: 3px solid #1b1430; border-radius: 999px;
-    background: #ffe066; color: #1b1430; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-  #hud { position: fixed; top: calc(env(safe-area-inset-top) + 10px); left: 0; right: 0; display: flex; justify-content: space-between;
-    padding: 0 16px; font-weight: 800; font-size: 18px; pointer-events: none; text-shadow: 0 2px 0 #1b1430; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#0b0816; color:#fff;
+    font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo","Noto Sans JP",system-ui,sans-serif;
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; -webkit-text-size-adjust:100%; }
+  canvas#game { position:fixed; inset:0; touch-action:none; }
+  /* 論理 390×780 の DOM の層。engine.js が canvas と同じ倍率で拡縮する */
+  #ui { position:fixed; width:390px; height:780px; left:0; top:0; transform-origin:0 0; pointer-events:none; }
+  #ui > * { pointer-events:auto; }
+  .hidden { display:none !important; }
+  p { margin:0; line-height:1.6; }
+  button { font:inherit; font-weight:900; font-size:var(--fsb); color:var(--ink); background:var(--sun); border:3px solid var(--ink); border-radius:16px;
+    padding:0 14px; min-height:56px; cursor:pointer; touch-action:manipulation; -webkit-tap-highlight-color:transparent; box-shadow:0 5px 0 var(--ink); line-height:1.2; }
+  button:active { transform:translateY(4px); box-shadow:0 1px 0 var(--ink); }
+  button:disabled { background:#8a8a8a !important; color:#ddd; box-shadow:0 5px 0 #555; }
+  button.sky { background:var(--sky); } button.leaf { background:var(--leaf); } button.orange { background:var(--orange); } button.pink { background:var(--pink); } button.lav { background:#e8e0ff; } button.gray { background:#d9d4e8; }
+  button.small { min-height:44px; font-size:15px; padding:0 10px; }
+  .xbtn { position:absolute; right:8px; top:6px; width:52px; height:52px; min-height:52px; padding:0; font-size:24px; background:var(--cream); border-radius:50%; z-index:3; }
+  /* 上の帯 */
+  #hud { position:absolute; left:0; top:0; width:390px; height:52px; background:rgba(27,20,48,.92); display:flex; align-items:center; justify-content:space-between; padding:0 10px; font-weight:900; }
+  #hud .money { font-size:22px; color:var(--sun); font-variant-numeric:tabular-nums; }
+  #hud .place { font-size:16px; color:#fff; }
+  #hud .mdiff { position:absolute; left:14px; top:50px; font-size:18px; font-weight:900; text-shadow:0 2px 0 var(--ink); transition:opacity .3s, transform 1.1s; pointer-events:none; }
+  /* 下の帯(町) */
+  #bottom { position:absolute; left:0; top:628px; width:390px; height:152px; background:rgba(27,20,48,.92); padding:12px 8px 0; }
+  #bottom .row { display:flex; gap:8px; }
+  #bottom .row button { flex:1; min-height:64px; padding:0 4px; font-size:16px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; }
+  #bottom .row button span.e { font-size:22px; line-height:1; }
+  #bottom .stat { margin-top:8px; font-size:var(--fs2); color:var(--sun); font-weight:900; text-align:center; }
+  #bottom .tip { margin-top:2px; font-size:15px; color:#fff; text-align:center; opacity:.9; height:44px; overflow:hidden; line-height:1.4; padding:0 6px; }
+  /* 会話の窓 */
+  #dialog { position:absolute; left:8px; top:468px; width:374px; min-height:160px; background:rgba(27,20,48,.95); border:3px solid #fff; border-radius:16px; padding:10px 14px 12px; z-index:4; }
+  #dialog .who { font-size:var(--fs2); color:var(--sun); font-weight:900; display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+  #dialog .who .face { font-size:34px; line-height:1; }
+  #dialog .body { font-size:var(--fs); font-weight:700; line-height:1.6; min-height:64px; white-space:pre-wrap; }
+  #dialog .next { position:absolute; right:14px; bottom:8px; color:var(--sun); font-size:16px; animation:blink 1s steps(2) infinite; }
+  #dialog .choices { display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+  #dialog .choices.two { flex-direction:row; } #dialog .choices button { flex:1; min-height:56px; font-size:var(--fsb); padding:0 8px; }
+  @keyframes blink { to { opacity:0; } }
+  /* 全面パネル(店・装備・なかま・もちもの・家の中) */
+  .panel { position:absolute; left:0; top:52px; width:390px; height:728px; background:rgba(20,12,42,.97); display:flex; flex-direction:column; z-index:3; }
+  .panel.full { top:0; height:780px; }
+  .panel .head { padding:8px 72px 6px 14px; min-height:60px; }
+  .panel .head h2 { margin:0; font-size:24px; font-weight:900; }
+  .panel .head .sub { font-size:15px; color:#ffd9a0; margin-top:2px; }
+  .panel .info { display:flex; justify-content:space-between; padding:0 14px 6px; flex-wrap:wrap; gap:0 10px; font-size:var(--fs2); color:var(--sun); font-weight:900; }
+  .panel .list { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 8px 8px; }
+  .panel .list::-webkit-scrollbar { width:6px; } .panel .list::-webkit-scrollbar-thumb { background:var(--sun); border-radius:3px; }
+  .row-item { display:flex; align-items:center; gap:10px; min-height:66px; padding:6px 10px; border-radius:12px; margin-bottom:4px; background:rgba(255,255,255,.06); font-weight:800; }
+  .row-item.sel { background:#fff3c4; color:var(--ink); }
+  .row-item .e { font-size:30px; line-height:1; width:36px; text-align:center; flex:none; }
+  .row-item .nm { flex:1; font-size:var(--fs); line-height:1.3; }
+  .row-item .nm small { display:block; font-size:14px; font-weight:700; opacity:.85; }
+  .row-item .pr { font-size:var(--fs2); font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap; }
+  .row-item .pr.no { color:var(--red); } .row-item.sel .pr.no { color:#c62828; }
+  .row-item.dim { opacity:.55; }
+  .up { color:#4ad66d; } .dn { color:#ff6a6a; } .row-item.sel .up { color:#2e7d32; } .row-item.sel .dn { color:#c62828; }
+  .desc { font-size:var(--fs2); font-weight:700; line-height:1.5; padding:6px 12px 10px; color:#ffe9b3; }
+  .panel .foot { display:flex; gap:8px; padding:8px; background:rgba(27,20,48,.95); }
+  .panel .foot button { flex:1; min-height:60px; }
+  /* 確認の窓 */
+  #confirm { position:absolute; left:20px; right:20px; top:230px; background:var(--cream); color:var(--ink); border:4px solid var(--ink); border-radius:20px; padding:18px 16px 16px; z-index:9; text-align:center; }
+  #confirm .msg { font-size:var(--fs); font-weight:800; line-height:1.6; margin-bottom:14px; white-space:pre-wrap; }
+  #confirm .btns { display:flex; gap:10px; } #confirm .btns button { flex:1; min-height:60px; }
+  #shade { position:absolute; inset:0; background:rgba(0,0,0,.55); z-index:8; }
+  /* タイトル・オープニング */
+  #title { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; padding:24px; z-index:5; }
+  #title h1 { margin:0; font-size:38px; font-weight:900; line-height:1.25; text-shadow:0 4px 0 #6b1d6b; }
+  #title h1 small { display:block; font-size:17px; color:var(--sun); text-shadow:none; margin-top:8px; font-weight:800; }
+  #title .emo { font-size:64px; line-height:1; animation:bob 1.2s ease-in-out infinite alternate; }
+  @keyframes bob { from { transform:translateY(0) rotate(-4deg); } to { transform:translateY(-8px) rotate(4deg); } }
+  #title button.main { width:300px; min-height:64px; font-size:22px; }
+  #title .tools { display:flex; gap:12px; } #title .tools button { width:64px; height:56px; padding:0; font-size:20px; background:#e8e0ff; }
+  #title .copy { font-size:13px; opacity:.7; }
+  #opening { position:absolute; inset:0; z-index:5; display:flex; align-items:center; justify-content:center; padding:0 30px; text-align:center; }
+  #opening .line { font-size:22px; font-weight:800; line-height:1.8; opacity:0; transition:opacity .5s; }
+  #opening .line.on { opacity:1; }
+  #opening .tapnext { position:absolute; right:20px; bottom:70px; color:var(--sun); font-size:16px; font-weight:800; animation:blink 1s steps(2) infinite; }
+  #opening .skip { position:absolute; right:12px; top:60px; min-height:48px; font-size:15px; background:rgba(255,255,255,.25); color:#fff; border-color:rgba(255,255,255,.5); box-shadow:none; }
+  /* ボス戦 */
+  #battle { position:absolute; inset:0; z-index:3; }
+  #battle .msg { position:absolute; left:8px; top:430px; width:374px; height:130px; background:rgba(27,20,48,.94); border:3px solid #fff; border-radius:16px; padding:10px 14px; font-size:var(--fs); font-weight:800; line-height:1.55; white-space:pre-wrap; overflow:hidden; }
+  #battle .msg .next { position:absolute; right:12px; bottom:6px; color:var(--sun); font-size:15px; animation:blink 1s steps(2) infinite; }
+  #battle .cmds { position:absolute; left:8px; top:576px; width:374px; display:flex; gap:8px; }
+  #battle .cmds button { flex:1; min-height:64px; font-size:20px; }
+  #battle .cmds button.spd { flex:0 0 72px; font-size:13px; background:#e8e0ff; padding:0 4px; }
+  #battle .grid { position:absolute; left:8px; top:650px; width:374px; height:124px; overflow-y:auto; -webkit-overflow-scrolling:touch; display:grid; grid-template-columns:1fr 1fr; gap:6px; align-content:start; padding-right:2px; }
+  #battle .grid::-webkit-scrollbar { width:6px; } #battle .grid::-webkit-scrollbar-thumb { background:var(--sun); border-radius:3px; }
+  #battle .grid button { min-height:56px; font-size:16px; text-align:left; padding:0 8px; display:flex; align-items:center; gap:6px; position:relative; }
+  #battle .grid button .e { font-size:22px; } #battle .grid button .chk { position:absolute; right:6px; top:2px; font-size:12px; }
+  #battle .grid button.glow { animation:glow .8s ease-in-out infinite alternate; }
+  @keyframes glow { from { box-shadow:0 5px 0 var(--ink), 0 0 0 0 #fff36b; } to { box-shadow:0 5px 0 var(--ink), 0 0 18px 6px #fff36b; } }
+  #battle .guardglow { animation:glow .6s ease-in-out infinite alternate; }
+  #battle .hint { position:absolute; left:8px; top:318px; width:374px; text-align:center; font-size:16px; font-weight:800; color:#ffb3c7; text-shadow:0 2px 0 var(--ink); line-height:1.4; }
+  /* 記念写真 */
+  #photoui { position:absolute; inset:0; z-index:3; }
+  #photoui .poses { position:absolute; left:8px; top:546px; width:374px; display:flex; gap:6px; justify-content:space-between; }
+  #photoui .poses button { width:56px; height:56px; padding:0; font-size:24px; background:#e8e0ff; }
+  #photoui .poses button.sel { background:var(--sun); box-shadow:0 5px 0 var(--ink), 0 0 0 3px var(--pink); }
+  #photoui .acts { position:absolute; left:8px; top:618px; width:374px; display:flex; gap:8px; }
+  #photoui .acts button { min-height:64px; } #photoui .acts .save { flex:1.6; } #photoui .acts .shuf { flex:1; background:#e8e0ff; }
+  #photoui .end { position:absolute; left:95px; top:700px; width:200px; min-height:56px; background:var(--sky); }
+  #photoui .bg { position:absolute; right:8px; top:4px; display:flex; gap:6px; align-items:center; font-weight:900; font-size:16px; }
+  #photoui .bg button { width:44px; height:44px; min-height:44px; padding:0; font-size:18px; background:#e8e0ff; }
+  .toast { position:absolute; left:30px; right:30px; top:300px; background:var(--cream); color:var(--ink); border:3px solid var(--ink); border-radius:16px; padding:14px; font-weight:900; font-size:var(--fs); text-align:center; z-index:20; }
+  #rotate { position:fixed; inset:0; z-index:99; background:#140c2a; display:none; align-items:center; justify-content:center; font-size:22px; font-weight:900; text-align:center; }
+  @media (orientation: landscape) and (max-height: 500px) { #rotate { display:flex; } }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
-<div id="hud"><span id="score">0</span><span id="best"></span></div>
-<div id="title" class="overlay">
-  <h1>勇者へっぽこの小さな冒険</h1>
-  <p>隣町に大魔王が現れた!お金持ちの子・へっぽこが、お金の力で武器と仲間をそろえて、ただ一度の大決戦へ。笑って泣ける小さなRPG。</p>
-  <button id="btnPlay" type="button">あそぶ</button>
-</div>
-<div id="over" class="overlay hidden">
-  <h1 id="overText">おしまい</h1>
-  <p id="overScore"></p>
-  <button id="btnAgain" type="button">もういっかい</button>
-</div>
+<div id="ui"></div>
+<div id="rotate">📱 スマホを たてに してね</div>
+<script src="js/data.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/map.js"></script>
+<script src="js/battle.js"></script>
+<script src="js/doll.js"></script>
+<script src="js/town.js"></script>
+<script src="js/menu.js"></script>
+<script src="js/battle-ui.js"></script>
+<script src="js/photo.js"></script>
+<script src="js/main.js"></script>
 <script>
-'use strict';
-/* ★ これは「ひな型」。ゲームの中身(update / draw / 入力)を ここに作りこむ。
-   守ること: 論理サイズを固定して拡縮・タップ操作・最初のタップで開始・ポーズ(blur)・ハイスコア(localStorage)・壊れても固まらない */
-var CONFIG = { W: 360, H: 640, DT: 1 / 60, BEST_KEY: 'heppoko-best' };
-var cv = document.getElementById('game'), ctx = cv.getContext('2d');
-var G = { state: 'title', score: 0, best: 0, t: 0, px: CONFIG.W / 2, paused: false };
-try { G.best = +localStorage.getItem(CONFIG.BEST_KEY) || 0; } catch (e) {}
-document.getElementById('best').textContent = G.best ? 'ベスト ' + G.best : '';
-
-function resize() {
-  var dpr = Math.min(window.devicePixelRatio || 1, 3);
-  cv.width = Math.round(innerWidth * dpr); cv.height = Math.round(innerHeight * dpr);
-  var s = Math.min(cv.width / CONFIG.W, cv.height / CONFIG.H);
-  ctx.setTransform(s, 0, 0, s, (cv.width - CONFIG.W * s) / 2, (cv.height - CONFIG.H * s) / 2);
-}
-addEventListener('resize', resize); resize();
-
-function toLogical(ev) {
-  var r = cv.getBoundingClientRect(), s = Math.min(r.width / CONFIG.W, r.height / CONFIG.H);
-  return { x: (ev.clientX - r.left - (r.width - CONFIG.W * s) / 2) / s, y: (ev.clientY - r.top - (r.height - CONFIG.H * s) / 2) / s };
-}
-cv.addEventListener('pointerdown', function (ev) { if (G.state === 'play') G.px = toLogical(ev).x; });
-cv.addEventListener('pointermove', function (ev) { if (G.state === 'play' && ev.buttons) G.px = toLogical(ev).x; });
-addEventListener('keydown', function (ev) { if (ev.key === 'ArrowLeft') G.px -= 20; if (ev.key === 'ArrowRight') G.px += 20; });
-
-function start(ev) {
-  G.state = 'play'; G.score = 0; G.t = 0; G.px = CONFIG.W / 2;
-  document.getElementById('title').classList.add('hidden'); document.getElementById('over').classList.add('hidden');
-  // iPhone / Android で最初のタップのあとに全画面にする(失敗してもそのまま遊べる)。#play の自動開始では やらない
-  if (ev && ev.isTrusted) try {
-    var el = document.documentElement, fs = el.requestFullscreen || el.webkitRequestFullscreen;
-    var pr = fs && fs.call(el);
-    if (pr && pr.catch) pr.catch(function () {});   // 断られても(自動確認のときなど)エラーにしない
-  } catch (e) {}
-}
-function finish() {
-  G.state = 'over';
-  if (G.score > G.best) { G.best = G.score; try { localStorage.setItem(CONFIG.BEST_KEY, String(G.best)); } catch (e) {} }
-  document.getElementById('overScore').textContent = 'スコア ' + G.score + (G.best ? ' / ベスト ' + G.best : '');
-  document.getElementById('over').classList.remove('hidden');
-}
-document.getElementById('btnPlay').addEventListener('click', start);
-document.getElementById('btnAgain').addEventListener('click', start);
-document.addEventListener('visibilitychange', function () { if (document.hidden) G.paused = true; else G.paused = false; });
-
-function update(dt) {
-  G.t += dt; G.score = Math.floor(G.t * 10);
-  G.px = Math.max(20, Math.min(CONFIG.W - 20, G.px));
-  if (G.t > 15) finish();                       // ← ひな型: 15秒で おしまい。ここに ゲームの勝ち負けを書く
-  document.getElementById('score').textContent = G.score;
-}
-function draw() {
-  ctx.fillStyle = '#1b2a4a'; ctx.fillRect(-1000, -1000, 3000, 3000);
-  ctx.fillStyle = '#ffe066'; ctx.beginPath(); ctx.arc(G.px, CONFIG.H - 120, 20, 0, 6.283); ctx.fill();   // ← ひな型の 丸
-}
-
-var last = 0, acc = 0;
-function loop(now) {
-  requestAnimationFrame(loop);
-  try {
-    var dt = Math.min((now - last) / 1000, 0.05); last = now;
-    if (G.state === 'play' && !G.paused) { acc += dt; while (acc >= CONFIG.DT) { update(CONFIG.DT); acc -= CONFIG.DT; } }
-    draw();
-  } catch (e) { console.error(e); }             // 1回の失敗で 全体が止まらないように
-}
-requestAnimationFrame(function (t) { last = t; loop(t); });
-// 確認用: アドレスのうしろに #play をつけると、タイトルを飛ばして すぐ始まる(スクショ・自動確認で使う)
-if (location.hash === '#play') start();
-
-// LINE の中で開いたときだけ、1回だけ案内する(LINE の中は画面が小さく、ホーム画面にも入れられない)
+// LINE の中で開いたときだけ、1回だけ案内する
 (function () {
   var seenKey = 'heppoko-line-tip', seen = false;
   try { seen = localStorage.getItem(seenKey) === '1'; } catch (e) {}
   var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
   if (!/\bLine\//i.test(navigator.userAgent) || standalone || seen) return;
   var bar = document.createElement('div');
-  bar.style.cssText = 'position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:99999;background:#fffaf0;color:#1b1430;border:3px solid #1b1430;border-radius:14px;padding:10px 40px 10px 12px;font:700 13px/1.5 system-ui,sans-serif';
+  bar.style.cssText = 'position:fixed;left:8px;right:8px;top:calc(56px + env(safe-area-inset-top,0px));z-index:99999;background:#fffaf0;color:#1b1430;border:3px solid #1b1430;border-radius:14px;padding:10px 40px 10px 12px;font:700 13px/1.5 system-ui,sans-serif';
   bar.textContent = 'LINEの中だと画面が小さめです。右下の「…」(または右上の︙)から「ブラウザで開く」を選ぶと、大きく遊べて、ホーム画面にも入れられます。';
   var x = document.createElement('button'); x.type = 'button'; x.setAttribute('aria-label', 'とじる'); x.textContent = '×';
-  x.style.cssText = 'position:absolute;top:4px;right:6px;width:32px;height:32px;border:0;background:none;font:900 20px/1 system-ui;color:#1b1430;cursor:pointer';
+  x.style.cssText = 'position:absolute;top:4px;right:6px;width:32px;height:32px;min-height:0;border:0;background:none;box-shadow:none;font:900 20px/1 system-ui;color:#1b1430;cursor:pointer;padding:0';
   x.addEventListener('click', function () { try { localStorage.setItem(seenKey, '1'); } catch (e) {} bar.remove(); });
   bar.appendChild(x); addEventListener('load', function () { document.body.appendChild(bar); });
 })();
-
-// ホーム画面に入れられる(アプリのように開く)ための登録。file:// や 登録できない所では 何もしない
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
   addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
 }
 </script>
 <script>
-  // はじめの画面(Google Play 風: インストール / このまま遊ぶ)。install.js が出す。ホーム画面から開いたときは出ない
-  window.INSTALL_GATE = { id: 'heppoko', name: '勇者へっぽこの小さな冒険', icon: 'icon-192.png', tagline: '', desc: '隣町に大魔王が現れた!お金持ちの子・へっぽこが、お金の力で武器と仲間をそろえて、ただ一度の大決戦へ。笑って泣ける小さなRPG。',
-    points: [], shots: [], badges: ['無料', '広告なし', '登録なし'] };
+  window.INSTALL_GATE = { id: 'heppoko', name: '勇者へっぽこの小さな冒険', icon: 'icon-192.png', color: '#1b2a4a',
+    tagline: 'お金の力で 勇者になる、笑えて 熱い 小さなRPG',
+    desc: '隣町に大魔王が現れた!勇者にあこがれる お金持ちの子・へっぽこが、1,000万Gのお小づかいで 武器と防具をそろえ、町じゅうから仲間を10組集めて、たった一度の大決戦へ。装備は100種類以上、仲間は30組以上、無駄コマンドが実は最強!?勝ったら決めポーズで記念写真。',
+    points: ['装備100種類以上。フライパンも こたつも 金のうんちも 装備できる', '仲間は30組以上から10組。隣の家のおばさんが いちばん強い', 'ボス戦は一度きり。「あやまる」「ほめる」が 最強の一手になることも'],
+    shots: ['shots/1.jpg', 'shots/2.jpg', 'shots/3.jpg', 'shots/4.jpg', 'shots/5.jpg'], badges: ['無料', '広告なし', '登録なし', 'スマホは縦向き'], playLabel: '▶ このまま遊ぶ', shield: true };
 </script>
 <script src="install.js"></script>
 </body>
