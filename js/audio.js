@@ -6,7 +6,8 @@ var AUDIO = (function () {
   var MUTE_KEY = 'heppoko-mute';
   try { muted = localStorage.getItem(MUTE_KEY) === '1'; } catch (e) {}
   function unlock() {
-    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+    if (document.hidden) return;   // 画面が隠れているときは 鳴らさない(閉じたあとに音が残らないように)
+    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); startTimer(); return; }
     try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
     master = ctx.createGain(); master.gain.value = muted ? 0 : 0.5; master.connect(ctx.destination);
     if (cur) { var name = cur; cur = null; bgm(name); }
@@ -65,12 +66,31 @@ var AUDIO = (function () {
     cur = name; step = 0;
     if (timer) { clearInterval(timer); timer = null; }
     if (!ctx || !name) return;
-    nextT = ctx.currentTime + 0.05; timer = setInterval(tick, 100); tick();
+    startTimer(); tick();
   }
   function stop() { bgm(null); }
+  /* 曲を進める時計。画面が隠れたら止める(鳴っている間は ブラウザが時計を止めないため、閉じたあとも曲が続いてしまう) */
+  function startTimer() {
+    if (!ctx || !cur || timer || document.hidden) return;
+    nextT = ctx.currentTime + 0.05; timer = setInterval(tick, 100);
+  }
+  function suspend() {
+    if (timer) { clearInterval(timer); timer = null; }
+    try { if (ctx && ctx.state === 'running') ctx.suspend(); } catch (e) {}
+  }
+  function resume() {
+    if (document.hidden || !ctx) return;
+    try { if (ctx.state === 'suspended') ctx.resume(); } catch (e) {}
+    startTimer();
+  }
+  document.addEventListener('visibilitychange', function () { if (document.hidden) suspend(); else resume(); });
+  addEventListener('pagehide', suspend);
+  addEventListener('pageshow', function () { resume(); });
+  document.addEventListener('freeze', suspend);
+  // 画面が隠れていても 曲の名前だけ覚えておき、戻ったら続きから
   /* 効果音 */
   function sfx(name) {
-    if (!ctx) return; var t = ctx.currentTime;
+    if (!ctx || document.hidden) return; var t = ctx.currentTime;
     switch (name) {
       case 'tap': tone(880, t, 0.05, 'square', 0.12); break;
       case 'ok': tone(660, t, 0.06, 'square', 0.14); tone(990, t + 0.06, 0.1, 'square', 0.14); break;
@@ -98,5 +118,5 @@ var AUDIO = (function () {
       case 'laugh': [300, 280, 300, 280, 260].forEach(function (f, i) { tone(f, t + i * 0.1, 0.09, 'square', 0.1); }); break;
     }
   }
-  return { unlock: unlock, bgm: bgm, stop: stop, sfx: sfx, setMute: setMute, isMuted: isMuted };
+  return { unlock: unlock, bgm: bgm, stop: stop, sfx: sfx, setMute: setMute, isMuted: isMuted, suspend: suspend, resume: resume, state: function () { return { ctx: ctx ? ctx.state : 'none', timer: !!timer, cur: cur }; } };
 })();

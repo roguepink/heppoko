@@ -3,7 +3,7 @@
    ゲームは index.html 1枚で完結しているので、それと アイコン類だけを覚えておく。
    ゲームを直しただけなら VERSION は そのままでいい(開くたびに、まずネットで最新を取りにいくので)。
    FILES(覚えるファイル)を変えたときだけ VERSION を 1つ上げる(古い覚えを 一斉に捨てる)。 */
-const VERSION = 'heppoko-v2';
+const VERSION = 'heppoko-v3';
 const FILES = ['./', 'index.html', 'install.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png',
   'js/data.js', 'js/audio.js', 'js/engine.js', 'js/map.js', 'js/battle.js', 'js/doll.js', 'js/town.js', 'js/menu.js', 'js/battle-ui.js', 'js/photo.js', 'js/main.js',
   'shots/1.jpg', 'shots/2.jpg', 'shots/3.jpg', 'shots/4.jpg', 'shots/5.jpg'];
