@@ -192,7 +192,7 @@
   #photoui .end { position:absolute; left:95px; top:708px; width:200px; min-height:56px; background:var(--sky); box-shadow:0 5px 0 var(--sky-d); }
   #photoui .bg { position:absolute; right:8px; top:4px; display:flex; gap:6px; align-items:center; font-weight:900; font-size:16px; }
   #photoui .bg button { width:44px; height:44px; min-height:44px; padding:0; font-size:18px; background:var(--card); box-shadow:0 3px 0 var(--line); border-radius:50%; }
-  .toast { position:absolute; left:30px; right:30px; top:300px; background:var(--bubble); color:var(--ink); border:3px solid var(--ink); border-radius:22px; padding:14px; font-weight:900; font-size:var(--fs); text-align:center; z-index:20; box-shadow:0 5px 0 rgba(90,61,43,.3); animation:pop .3s cubic-bezier(.3,1.7,.5,1); }
+  .toast { pointer-events:none; position:absolute; left:30px; right:30px; top:300px; background:var(--bubble); color:var(--ink); border:3px solid var(--ink); border-radius:22px; padding:14px; font-weight:900; font-size:var(--fs); text-align:center; z-index:20; box-shadow:0 5px 0 rgba(90,61,43,.3); animation:pop .3s cubic-bezier(.3,1.7,.5,1); }
   #rotate { position:fixed; inset:0; z-index:99; background:var(--cream); color:var(--ink); display:none; align-items:center; justify-content:center; font-size:22px; font-weight:900; text-align:center; }
   @media (orientation: landscape) and (max-height: 500px) { #rotate { display:flex; } }
   @media (prefers-reduced-motion: reduce) { #title h1 .w, #opening .pic.pop span { animation:none; } }

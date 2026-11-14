@@ -98,7 +98,7 @@ function shopScene(shopId) {
       var pn = panel(sh.emoji + ' ' + sh.name, '「' + sh.talk.hello + '」'); this.pn = pn;
       var info = el('div', 'info'); pn.appendChild(info); var list = el('div', 'list'); pn.appendChild(list); var foot = el('div', 'foot'); pn.appendChild(foot); this.list = list;
       var selId = null, descEl = null;
-      function ownerToast(line) { toast(owner.emoji + ' ' + line, 2200); var t = ui.lastChild; if (t && t.className === 'toast') { t.style.pointerEvents = 'none'; t.style.top = '120px'; } } // 指を じゃましない。上のほうに 出す
+      function ownerToast(line) { toast(owner.emoji + ' ' + line, 2200); var t = ui.lastChild; if (t && t.className === 'toast') { t.style.pointerEvents = 'none'; t.style.top = '58px'; } } // 指を じゃましない。上のほうに 出す
       function refresh() { var st = heroStats(); info.innerHTML = '<span>' + sh.items.length + ' 品</span><span>いま: 攻 ' + st.atk + ' 守 ' + st.def + ' HP ' + st.hp + '</span>'; }
       function priceHtml(it) {
         if (P.equip[it.slot] === it.id) return '<span class="badge eq">そうび中</span>';
