@@ -5,7 +5,7 @@
    絵文字は、メイン画面では ATL / BIG(アトラス)、保存用 canvas では fillText で描く。
    そのため「描く道具の束 T = { c: 2D context, em: 絵文字を描く関数 }」を全部の描画関数に渡す。 */
 var DOLL = (function () {
-  var SKIN = '#ffd9b3', SKIN_EDGE = '#e0a97a', INK = '#1b1430';
+  var SKIN = '#ffd9b3', SKIN_EDGE = '#e0a97a', INK = '#5a3d2b', EYE = '#3a2418';
   var HAIR = '#6b4226', HAIR_HI = '#8a5a35';                    // 髪(茶色のマッシュルーム)
   var SHIRT = '#ffffff', SHIRT_EDGE = '#d9cdc0', PANTS = '#3f7fd9', PANTS_EDGE = '#2c5fae';   // ふだん着
   var SOCK = '#ffffff', SHOE = '#e63e3e', SHOE_EDGE = '#b02a2a'; // 白い靴下・赤い靴
@@ -30,14 +30,64 @@ var DOLL = (function () {
      body = 腰を軸にした上半身の傾き、head = 首を軸にした頭の傾き、dy = 全体の上下、shadow = 影の横半径
      腕を上げる角度は 2.0 前後まで(それ以上だと、大きな頭に手がかぶる) */
   var POSES = {
-    normal: { rArm: 0.25, lArm: 0.25, rLeg: 0.00, lLeg: 0.00, body: 0.00, head: 0.00, dy: 0, face: '😊', shadow: 90, cape: 0 },
-    hero:   { rArm: 2.00, lArm: 0.55, rLeg: 0.15, lLeg: 0.15, body: -0.04, head: -0.08, dy: 0, face: '😤', shadow: 90, cape: -0.15 },
-    peace:  { rArm: 0.25, lArm: 1.95, rLeg: 0.00, lLeg: 0.10, body: 0.00, head: 0.10, dy: 0, face: '😆', shadow: 90, cape: 0 },
-    smug:   { rArm: 0.30, lArm: 0.60, rLeg: 0.00, lLeg: 0.30, body: -0.10, head: -0.15, dy: 0, face: '😎', shadow: 90, cape: -0.3 },
-    jump:   { rArm: 1.90, lArm: 1.90, rLeg: 0.40, lLeg: 0.40, body: 0.00, head: 0.00, dy: -40, face: '😝', shadow: 50, cape: 0.1 },
-    money:  { rArm: 1.95, lArm: 1.95, rLeg: 0.10, lLeg: 0.10, body: -0.05, head: 0.05, dy: -6, face: '🤑', shadow: 90, cape: 0 },
-    sleep:  { rArm: 0.35, lArm: 0.35, rLeg: 0.05, lLeg: 0.05, body: 0.00, head: 0.10, dy: 0, face: '😴', shadow: 150, cape: 0, lie: true }
+    normal: { rArm: 0.25, lArm: 0.25, rLeg: 0.00, lLeg: 0.00, body: 0.00, head: 0.00, dy: 0, face: 'smile', shadow: 90, cape: 0 },
+    hero:   { rArm: 2.00, lArm: 0.55, rLeg: 0.15, lLeg: 0.15, body: -0.04, head: -0.08, dy: 0, face: 'brave', shadow: 90, cape: -0.15 },
+    peace:  { rArm: 0.25, lArm: 1.95, rLeg: 0.00, lLeg: 0.10, body: 0.00, head: 0.10, dy: 0, face: 'wink', shadow: 90, cape: 0 },
+    smug:   { rArm: 0.30, lArm: 0.60, rLeg: 0.00, lLeg: 0.30, body: -0.10, head: -0.15, dy: 0, face: 'doya', shadow: 90, cape: -0.3 },
+    jump:   { rArm: 1.90, lArm: 1.90, rLeg: 0.40, lLeg: 0.40, body: 0.00, head: 0.00, dy: -40, face: 'excited', shadow: 50, cape: 0.1 },
+    money:  { rArm: 1.95, lArm: 1.95, rLeg: 0.10, lLeg: 0.10, body: -0.05, head: 0.05, dy: -6, face: 'money', shadow: 90, cape: 0 },
+    sleep:  { rArm: 0.35, lArm: 0.35, rLeg: 0.05, lLeg: 0.05, body: 0.00, head: 0.10, dy: 0, face: 'sleep', shadow: 150, cape: 0, lie: true }
   };
+
+  /* ---------- 手描きの顔(目・まゆ・口)。expr はポーズごとの表情 ---------- */
+  var FACES = { smile: 1, brave: 1, wink: 1, doya: 1, excited: 1, money: 1, sleep: 1 };
+  function drawFace(c, hx, hy, expr, t) {
+    var L = hx - 26, Rx = hx + 26, ey = hy + 8;
+    c.save(); c.lineCap = 'round'; c.lineJoin = 'round'; c.strokeStyle = EYE; c.fillStyle = EYE;
+    function oval(x) {   // 黒い楕円の目 + 白い光の点
+      c.fillStyle = EYE; c.beginPath(); c.ellipse(x, ey, 9, 12.5, 0, 0, TAU); c.fill();
+      c.fillStyle = '#fff'; c.beginPath(); c.arc(x - 3, ey - 5, 3.6, 0, TAU); c.fill();
+      c.beginPath(); c.arc(x + 3.5, ey + 4.5, 1.6, 0, TAU); c.fill();
+    }
+    function happy(x) { c.lineWidth = 5; c.beginPath(); c.arc(x, ey + 6, 10, Math.PI * 1.1, Math.PI * 1.9); c.stroke(); }   // ^ の目
+    function line(x) { c.lineWidth = 5; c.beginPath(); c.moveTo(x - 10, ey + 2); c.quadraticCurveTo(x, ey + 7, x + 10, ey + 2); c.stroke(); }   // ー の目(ねむい)
+    function arrow(x, sd) { c.lineWidth = 5; c.beginPath(); c.moveTo(x - 8 * sd, ey - 8); c.lineTo(x + 7 * sd, ey); c.lineTo(x - 8 * sd, ey + 8); c.stroke(); }   // > < の目
+    function coin(x) {   // お金の目(金色の G)
+      c.fillStyle = '#ffd84d'; c.strokeStyle = '#d9a400'; c.lineWidth = 3; c.beginPath(); c.arc(x, ey, 13, 0, TAU); c.fill(); c.stroke();
+      c.fillStyle = EYE; c.font = '900 17px ' + TEXT_FONT; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('G', x, ey + 1);
+      c.fillStyle = '#fff'; c.beginPath(); c.arc(x - 6, ey - 6, 2.6, 0, TAU); c.fill(); c.strokeStyle = EYE;
+    }
+    function brows(lift, tilt) {   // 短いまゆ。lift = 上げる量、tilt = 内側を下げる量(きりっ)
+      c.lineWidth = 4.5; c.strokeStyle = EYE;
+      c.beginPath(); c.moveTo(L - 9, ey - 21 - lift); c.lineTo(L + 8, ey - 21 - lift + tilt); c.stroke();
+      c.beginPath(); c.moveTo(Rx + 9, ey - 21 - lift); c.lineTo(Rx - 8, ey - 21 - lift + tilt); c.stroke();
+    }
+    function smileMouth(w) { c.lineWidth = 4.5; c.strokeStyle = EYE; c.beginPath(); c.arc(hx, hy + 22, w, Math.PI * 0.2, Math.PI * 0.8); c.stroke(); }
+    function openMouth(w, h) {   // 大きく開いた口 + 舌
+      var my = hy + 28;
+      c.beginPath(); c.moveTo(hx - w, my); c.quadraticCurveTo(hx, my - 3, hx + w, my); c.quadraticCurveTo(hx + w * 0.9, my + h * 1.6, hx, my + h * 1.6); c.quadraticCurveTo(hx - w * 0.9, my + h * 1.6, hx - w, my); c.closePath();
+      c.fillStyle = '#8a3a2a'; c.fill();
+      c.save(); c.clip(); c.fillStyle = '#ff8fa3'; c.beginPath(); c.ellipse(hx, my + h * 1.55, w * 0.6, h * 0.6, 0, 0, TAU); c.fill(); c.restore();
+      c.lineWidth = 3.5; c.strokeStyle = EYE; c.stroke();
+    }
+    if (expr === 'brave') { oval(L); oval(Rx); brows(0, 6); openMouth(11, 7); }
+    else if (expr === 'wink') { oval(L); happy(Rx); brows(3, -2); openMouth(12, 8); }
+    else if (expr === 'doya') { happy(L); happy(Rx); brows(7, -3); openMouth(17, 11); }
+    else if (expr === 'excited') { arrow(L, 1); arrow(Rx, -1); brows(6, -2); openMouth(15, 11); }
+    else if (expr === 'money') { coin(L); coin(Rx); brows(6, -3); openMouth(16, 11); }
+    else if (expr === 'sleep') { line(L); line(Rx); c.lineWidth = 3.5; c.beginPath(); c.ellipse(hx, hy + 32, 5, 6, 0, 0, TAU); c.stroke(); }
+    else { oval(L); oval(Rx); brows(0, 0); smileMouth(11); }
+    c.restore();
+  }
+  /* お金持ちの子の しるし: 金の蝶ネクタイ(装備がなくても いつも見える) */
+  function bowTie(c) {
+    c.save(); c.lineJoin = 'round'; c.fillStyle = '#ffd84d'; c.strokeStyle = INK; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(195, 334); c.lineTo(173, 322); c.quadraticCurveTo(168, 334, 173, 346); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(195, 334); c.lineTo(217, 322); c.quadraticCurveTo(222, 334, 217, 346); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#d9a400'; c.beginPath(); c.arc(195, 334, 6.5, 0, TAU); c.fill(); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,.7)'; c.beginPath(); c.ellipse(179, 328, 4, 2, -0.4, 0, TAU); c.fill(); c.beginPath(); c.ellipse(211, 328, 4, 2, 0.4, 0, TAU); c.fill();
+    c.restore();
+  }
 
   /* ---------- 描く道具の束 ---------- */
   function emojiMain(e, x, y, s, a) { if (!e) return; if (s > 100) BIG.draw(e, x, y, s, a); else ATL.draw(e, x, y, s, a); }
@@ -184,6 +234,7 @@ var DOLL = (function () {
     var waist = look(eq, 'waist');
     if (waist) T.em(waist, 195, 442, 60 * K('waist')); else dotted(195, 442, 20);
 
+    bowTie(c);
     /* 5 お守り(ひも + 絵文字)。頭より先に描いて、ひもの上端は あごの下に隠れる */
     var charm = look(eq, 'charm');
     if (charm) {
@@ -208,7 +259,6 @@ var DOLL = (function () {
     c.beginPath(); c.arc(hx - hr + 2, hy + 10, 13, 0, TAU); c.fill(); c.stroke();   // 耳
     c.beginPath(); c.arc(hx + hr - 2, hy + 10, 13, 0, TAU); c.fill(); c.stroke();
     c.beginPath(); c.arc(hx, hy, hr, 0, TAU); c.fill(); c.stroke();                 // 顔の丸
-    T.em(face, hx, hy + 6, 108);                                 // 表情(肌の丸より少し小さく、ふちを残す)
     /* 髪: 頭より少し大きい丸の上半分 + 前髪のギザギザ + 横の毛(マッシュルーム) */
     c.save();
     c.beginPath(); c.arc(hx, hy + 2, hr + 5, 0, TAU); c.clip();
@@ -219,10 +269,11 @@ var DOLL = (function () {
     RR(c, hx - hr - 6, hy - 40, 20, 54, 9, HAIR); RR(c, hx + hr - 14, hy - 40, 20, 54, 9, HAIR);            // 横の毛(耳にかかる)
     c.fillStyle = HAIR_HI; c.beginPath(); c.ellipse(hx - 24, hy - 60, 20, 6, -0.3, 0, TAU); c.fill();     // つや
     c.restore();
-    /* ほっぺの赤み */
-    c.fillStyle = 'rgba(255,105,125,.42)';
-    c.beginPath(); c.ellipse(hx - 48, hy + 26, 13, 8, 0, 0, TAU); c.fill();
-    c.beginPath(); c.ellipse(hx + 48, hy + 26, 13, 8, 0, 0, TAU); c.fill();
+    /* ほっぺ(ピンクの丸) → 手描きの顔。知らない表情名(絵文字)が来たら 前と同じく絵文字を貼る */
+    c.fillStyle = 'rgba(255,143,200,.55)';
+    c.beginPath(); c.arc(hx - 50, hy + 24, 12, 0, TAU); c.fill();
+    c.beginPath(); c.arc(hx + 50, hy + 24, 12, 0, TAU); c.fill();
+    if (FACES[face]) drawFace(c, hx, hy, face, t); else T.em(face, hx, hy + 6, 108);
     var fc = look(eq, 'face');
     if (fc) T.em(fc, hx, hy + 6, 80 * K('face'));
     else dotted(hx + 62, hy - 52, 10);                           // かお の空き: 表情にかぶらないよう 顔の右上に小さく
@@ -299,7 +350,7 @@ var DOLL = (function () {
     var sc = 0.6 + 0.4 * easeOutBack(cl(t / 0.25, 0, 1));
     var breath = Math.sin(gt * Math.PI) * 4;
     var pop = (slot && t >= 0.25 && t < 0.55) ? { slot: slot, k: 1.4 - 0.4 * ((t - 0.25) / 0.3) } : null;
-    drawDoll(mainTools(), 195, 350, sc, { t: gt, pop: pop });
+    drawDoll(mainTools(), 195, 350, sc, { t: gt, pop: pop, noEmpty: true });
     /* 新しい装備の位置に 白い星形フラッシュ(0.20〜0.45)と ✨×6(0.25〜0.60) */
     if (slot) {
       var wp = slotWorld(slot, 195, 350, sc, breath);
@@ -453,14 +504,17 @@ var DOLL = (function () {
     if (!lie) hero();
     for (i = 0; i < front.length; i++) drawComp(T, front[i], FRONT_X[i], frontY, 52, sync);
     if (lie) hero();
-    /* 下の帯 */
-    c.fillStyle = '#c62828'; c.fillRect(0, 400, 360, 42);
-    c.fillStyle = '#ffe066'; c.fillRect(0, 400, 360, 2); c.fillRect(0, 440, 360, 2);
-    var title = '大魔王討伐記念  ' + (opts.date || '');
-    c.font = '900 17px ' + TEXT_FONT; var tw = c.measureText(title).width, x0 = 180 - (tw + 26) / 2;
-    T.em('🏆', x0 + 10, 413, 20);
-    TX(c, title, x0 + 26, 413, 17, '#fff', 'left', 900, null);
-    if (opts.record) TX(c, opts.record, 180, 431, 11, '#ffe9b3', 'center', 800, null);
+    /* 下の帯(金色)。題は opts.title(DATA.TEXTS.photoTitle)。長ければ 字を小さくして 1行に収める */
+    c.fillStyle = '#ffd84d'; c.fillRect(0, 400, 360, 42);
+    c.fillStyle = INK; c.fillRect(0, 400, 360, 2.5); c.fillRect(0, 439.5, 360, 2.5);
+    var title = opts.title || '大魔王討伐記念', fs = 17;
+    c.font = '900 ' + fs + 'px ' + TEXT_FONT; var tw = c.measureText(title).width;
+    if (tw > 316) { fs = Math.max(11, Math.floor(fs * 316 / tw)); c.font = '900 ' + fs + 'px ' + TEXT_FONT; tw = c.measureText(title).width; }
+    var x0 = 180 - (tw + 24) / 2;
+    T.em('🏆', x0 + 9, 414, 18);
+    TX(c, title, x0 + 24, 414, fs, INK, 'left', 900, null);
+    var rec = (opts.record || '') + (opts.date ? (opts.record ? '  ' : '') + opts.date : '');
+    if (rec) TX(c, rec, 180, 431, 11, '#8a5a00', 'center', 800, null);
     /* 帯の下の細い余白に、左: ロゴ / 右: アドレス(薄く) */
     TX(c, '勇者へっぽこ', 6, 446, 7, 'rgba(255,255,255,.7)', 'left', 900, null);
     TX(c, 'roguepink.github.io/heppoko', 355, 446, 7, 'rgba(255,255,255,.7)', 'right', 800, null);
@@ -470,8 +524,8 @@ var DOLL = (function () {
   /* 画面の写真枠: (x,y,w,h) が写真。その外側に白い縁 8px と影 */
   function drawPhotoFrame(x, y, w, h, opts) {
     ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 8;
-    rrect(x - 8, y - 8, w + 16, h + 16, 6, '#fff');
+    ctx.shadowColor = 'rgba(90,61,43,.35)'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 6;
+    rrect(x - 8, y - 8, w + 16, h + 16, 10, '#fff', INK, 3);
     ctx.restore();
     ctx.save(); ctx.translate(x, y); ctx.scale(w / 360, h / 450);
     drawPhoto(mainTools(), opts);

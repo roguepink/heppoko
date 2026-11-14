@@ -2,7 +2,7 @@
 /* 勝利の文(SCENES.win)と 記念写真の画面(SCENES.photo)。設計 9 章。
    写真の絵そのものは doll.js(DOLL.drawPhotoFrame / DOLL.renderPhoto)が描く。ここは画面の流れ・ボタン・保存。 */
 (function () {
-  var INK = '#1b1430';
+  var INK = '#5a3d2b';
   function texts() { return (window.DATA && DATA.TEXTS) || {}; }
   function pad2(n) { return (n < 10 ? '0' : '') + n; }
   function today(sep) { var d = new Date(); return d.getFullYear() + sep + pad2(d.getMonth() + 1) + sep + pad2(d.getDate()); }
@@ -48,7 +48,7 @@
       }
     },
     draw: function () {
-      var g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#2a1a5e'); g.addColorStop(1, '#6c4fb0');
+      var g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#fff3d6'); g.addColorStop(1, '#ffc9a3');
       ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
       for (var i = 0; i < WIN.conf.length; i++) {
         var p = WIN.conf[i]; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ATL.draw(p.e, 0, 0, p.s, 0.9); ctx.restore();
@@ -59,13 +59,13 @@
       /* 文の窓 */
       var lines = texts().victory || ['大魔王は にげていった!'];
       var s = lines[Math.min(WIN.idx, lines.length - 1)];
-      rrect(18, 300, 354, 200, 20, PAL.cream, INK, 4);
+      rrect(18, 300, 354, 200, 24, '#fffaf0', INK, 3);
       var rows = wrap(s, 310, 22), y0 = 400 - (rows.length - 1) * 18;
       for (i = 0; i < rows.length; i++) txt(rows[i], 195, y0 + i * 36, 22, INK, 'center', 900, null);
-      if (Math.floor(G.t * 2) % 2 === 0) txt(WIN.idx >= lines.length - 1 ? 'タップで 写真へ ▼' : 'タップで つぎへ ▼', 350, 482, 15, '#8a2be2', 'right', 900, null);
+      if (Math.floor(G.t * 2) % 2 === 0) txt(WIN.idx >= lines.length - 1 ? 'タップで 写真へ ▼' : 'タップで つぎへ ▼', 350, 482, 15, '#e0609f', 'right', 900, null);
       /* 何番目か */
       var dots = ''; for (i = 0; i < lines.length; i++) dots += (i === WIN.idx ? '●' : '○') + ' ';
-      txt(dots.trim(), 195, 530, 14, 'rgba(255,255,255,.8)', 'center', 900, null);
+      txt(dots.trim(), 195, 530, 14, '#d9a400', 'center', 900, null);
     },
     tap: function () {
       if (WIN.since < 0.25) return;    // 2 文いっぺんに飛ばない
@@ -97,7 +97,7 @@
     return s;
   }
   function photoOpts() {
-    return { bg: PH.bg, pose: PH.pose, comps: PH.comps, date: today('.'), record: recordText(), t: G.t };
+    return { bg: PH.bg, pose: PH.pose, comps: PH.comps, date: today('.'), record: recordText(), t: G.t, title: texts().photoTitle || '' };
   }
   function setBg(d) {
     PH.bg = (PH.bg + d + 3) % 3; var n = DOLL.BG_NAMES[PH.bg];
@@ -158,7 +158,7 @@
     /* 背景の切り替え(上の帯の右) */
     var bgbox = el('div', 'bg');
     bgbox.appendChild(btn('◀', '', function () { setBg(-1); }));
-    PH.bgLabel = el('span', '', ''); PH.bgLabel.style.cssText = 'width:134px;text-align:center;font-size:13px;white-space:nowrap;';
+    PH.bgLabel = el('span', '', ''); PH.bgLabel.style.cssText = 'width:134px;text-align:center;font-size:15px;white-space:nowrap;color:#5a3d2b;';
     bgbox.appendChild(PH.bgLabel);
     bgbox.appendChild(btn('▶', '', function () { setBg(1); }));
     root.appendChild(bgbox);
@@ -189,15 +189,15 @@
     leave: function () { closeFull(); if (PH.root) { PH.root.remove(); PH.root = null; } PH.poseBtns = []; PH.bgLabel = null; },
     update: function (dt) { if (PH.flash > 0) PH.flash = Math.max(0, PH.flash - dt * 3.3); },
     draw: function () {
-      ctx.fillStyle = '#140c2a'; ctx.fillRect(0, 0, W, H);
-      /* うすい模様 */
-      ctx.fillStyle = 'rgba(255,255,255,.04)';
+      ctx.fillStyle = '#fff6e6'; ctx.fillRect(0, 0, W, H);
+      /* うすい水玉 */
+      ctx.fillStyle = 'rgba(255,143,200,.14)';
       for (var i = 0; i < 12; i++) { ctx.beginPath(); ctx.arc((i * 97) % W, 560 + (i * 53) % 220, 30 + (i % 3) * 14, 0, Math.PI * 2); ctx.fill(); }
       /* 上の帯 */
-      ctx.fillStyle = 'rgba(27,20,48,.92)'; ctx.fillRect(0, 0, W, 52);
-      ATL.draw('📸', 24, 26, 26); txt('記念写真', 44, 27, 20, '#fff', 'left', 900, null);
+      ctx.fillStyle = '#ffd84d'; ctx.fillRect(0, 0, W, 52); ctx.fillStyle = INK; ctx.fillRect(0, 51, W, 3);
+      ATL.draw('📸', 24, 26, 26); txt('記念写真', 44, 27, 20, INK, 'left', 900, null);
       DOLL.drawPhotoFrame(15, 70, 360, 450, photoOpts());
-      txt('ポーズ: ' + (PH.poseName || ''), 8, 536, 13, 'rgba(255,255,255,.85)', 'left', 800, null);
+      txt('ポーズ: ' + (PH.poseName || ''), 12, 545, 17, INK, 'left', 900, null);
       if (PH.flash > 0) { ctx.fillStyle = 'rgba(255,255,255,' + PH.flash + ')'; ctx.fillRect(0, 0, W, H); }
     },
     key: function (k) { if (k === 's') doSave(); }
