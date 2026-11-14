@@ -79,7 +79,7 @@ var TOWN = (function () {
     if (n >= 3 && n < 10) L.push('仲間は ' + n + '/10。まだ さそえる');
     L.push('じゅんび OK? 🗺️で 南の出口へ!');
     L.push('🗺️いく で 行きたい所へ 自動で 歩くよ');
-    L.push('💬が 出ている人は 仲間に なってくれる');
+    L.push('足もとが ピンクの人は 仲間に なってくれる(近づくと 💬)');
     return L;
   }
   function setTip() {
@@ -292,9 +292,10 @@ var TOWN = (function () {
       list.push({ y: py, f: function () {
         var b = hop(p);
         if (p.kind === 'comp') {
-          var a = 0.55 + 0.45 * Math.sin(G.t * 4);
-          ctx.strokeStyle = 'rgba(255,143,200,' + a + ')'; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(x, y + 15, 18, 6, 0, 0, 7); ctx.stroke();
-          groupDraw(p.ref, x, y, b); bubble(x + 16, y - 30 - b);
+          /* ふだんは 足もとの うすい ピンクの輪だけ。近く(3マス以内)に来たら 💬 の吹き出しを出す */
+          var close3 = dist <= 3, a = close3 ? 0.6 + 0.4 * Math.sin(G.t * 4) : 0.45;
+          ctx.strokeStyle = 'rgba(255,143,200,' + a + ')'; ctx.lineWidth = close3 ? 4 : 3; ctx.beginPath(); ctx.ellipse(x, y + 15, 18, 6, 0, 0, 7); ctx.stroke();
+          groupDraw(p.ref, x, y, b); if (close3) bubble(x + 16, y - 30 - b);
         } else drawPerson(p.emoji, x, y, b);
       } });
     });

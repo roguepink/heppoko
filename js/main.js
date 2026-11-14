@@ -67,9 +67,16 @@ var DIALOG = (function () {
   var lines = [], idx = 0, full = '', shownN = 0, timer = null, doneAt = 0, cb = null, active = false, choosing = false;
   function speedMs() { return [0, 24, 12, 6][SETTINGS.textSpeed || 2]; } // ふつう = 12ms(前は 25ms)
   function whoHtml(w) { return w ? '<span class="face">' + esc(w.emoji || '') + '</span>' + (w.name ? '<span class="nm">' + esc(w.name) + '</span>' : '') : ''; }
+  /* へっぽこが話すときは 顔の丸に 手描きの顔(DOLL.faceCanvas)を描く。町の人は 絵文字のまま */
+  function setWho(w) {
+    who.innerHTML = whoHtml(w); who.style.display = w ? 'flex' : 'none';
+    if (w && w.name === 'へっぽこ' && window.DOLL && DOLL.faceCanvas) {
+      var f = who.querySelector('.face'); if (f) { f.textContent = ''; f.style.overflow = 'hidden'; f.style.background = '#fff6e6'; f.appendChild(DOLL.faceCanvas(50, w.expr || 'smile')); }
+    }
+  }
   function start(w, ls, done) {
     lines = ls.slice(); idx = 0; cb = done || null; active = true; choosing = false; node.classList.remove('danger'); hide(choices); choices.innerHTML = '';
-    who.innerHTML = whoHtml(w); who.style.display = w ? 'flex' : 'none';
+    setWho(w);
     show(node); showLine();
   }
   function showLine() {
@@ -90,7 +97,7 @@ var DIALOG = (function () {
   }
   function askChoices(w, text, list) {
     lines = [text]; idx = 0; active = true; choosing = true; cb = null; node.classList.remove('danger');
-    who.innerHTML = whoHtml(w); who.style.display = w ? 'flex' : 'none';
+    setWho(w);
     show(node); hide(next); choices.innerHTML = ''; choices.className = 'choices hidden' + (list.length === 2 ? ' two' : ''); // 文が出おわるまで ボタンは隠す
     list.forEach(function (c) { var b = btn(c.label, c.cls || '', function () { active = false; choosing = false; hide(node); hide(choices); c.fn && c.fn(); }); if (c.disabled) b.disabled = true; choices.appendChild(b); });
     full = text; shownN = 0; body.textContent = '';
@@ -178,6 +185,8 @@ SCENES.title = {
 function openingPic(s) {
   if (/はじまった|はじまる/.test(s)) return { doll: 'jump', side: ['🌈', '⭐'] };
   if (/ぼくも|なれるかも/.test(s)) return { doll: 'hero', side: ['✨', '✨'] };
+  if (/レシート/.test(s)) return { doll: 'smug', side: ['🧾', '🧾'] };
+  if (/買えば|ぜんぶ 買/.test(s)) return { doll: 'money', side: ['🛒', '💎'] };
   if (/ママ/.test(s)) return { em: ['👩', '💴', '💴'] };
   if (/お金持ち/.test(s)) return { em: ['🏰', '💰', '💎'] };
   if (/王さま/.test(s)) return { em: ['😰', '👑', '💤'] };
@@ -258,9 +267,11 @@ SCENES.lose = {
     P.losses++; var st = heroStats();
     var okane = P.losses <= 3 ? 50000 : 0;
     AUDIO.bgm('sad'); HUD.show();
-    var lines = DATA.TEXTS.defeat.slice();
-    if (okane) lines.push('王さまから おみまい金 ' + fmtG(okane) + ' が とどいた。「がんばれ。わしは 行かんが」');
-    var hint = untoldHint(); if (hint) lines.push('隣の おばさんが 教えてくれた。「' + hint + '」');
+    var lines = DATA.TEXTS.defeat.slice(0, 3);   // タップは 4回まで(負けの文 3行 + お見舞い金とヒントを 1行に)
+    var hint = untoldHint(), extra = [];
+    if (okane) extra.push('王さまから おみまい金 ' + fmtG(okane) + '。「がんばれ。わしは 行かんが」');
+    if (hint) extra.push('隣の おばさん:「' + hint + '」');
+    if (extra.length) lines.push(extra.join('\n'));
     say(null, lines, function () { if (okane) gain(okane); P.x = START.x; P.y = START.y; autosave(); go('town', { from: 'lose' }); });
   },
   tap: function () { DIALOG.tap(); },

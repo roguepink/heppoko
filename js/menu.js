@@ -29,7 +29,8 @@
     '.mn .badge.eq{background:var(--pink,#ff8fc8)}',
     '.mn .desc{color:var(--ink,#5a3d2b);background:#fff;border:3px dashed rgba(90,61,43,.35);border-radius:16px;margin:-2px 2px 10px;padding:10px 12px}',
     '.mn .buybox{display:flex;gap:8px;align-items:stretch;margin:10px 0 2px}',
-    '.mn .buybox .big{flex:1;min-height:64px;font-size:20px;padding:0 8px;border-radius:22px;white-space:nowrap}',
+    '.mn .buybox .big{flex:1 1 auto;min-width:0;min-height:64px;font-size:20px;padding:0 6px;border-radius:22px;white-space:nowrap;letter-spacing:-.5px}',
+    '@media (max-width:360px){.mn .buybox .big{font-size:18px}.mn .buybox .mini{flex-basis:88px!important}}',
     '.mn .buybox .mini{flex:0 0 100px;min-height:56px;font-size:17px;padding:0 4px;border-radius:22px;align-self:center}',
     '.mn .buybox .note{flex:1;text-align:center;font-weight:900;font-size:var(--fs,20px);padding:10px 0}',
     '.panel.mn .foot{background:#f6e4c4;border-top:3px solid var(--ink,#5a3d2b);padding:10px 8px 12px}',
@@ -46,9 +47,31 @@
     '.mn .prow .ud button{width:52px;min-height:48px;height:48px;padding:0;font-size:20px;border-radius:16px;box-shadow:0 3px 0 var(--ink,#5a3d2b)}',
     '.mn .prow .off{width:84px;min-height:56px;padding:0 4px;font-size:17px;border-radius:18px}',
     '.mn .prow .nm{cursor:pointer}',
+    /* 名前は 1行で。入らないときは 字を 少しずつ 縮める(17px まで。fitNames) */
+    '.panel.mn .row-item .nm{min-width:0}',
+    '.panel.mn .row-item .nm .n{display:block;white-space:nowrap;overflow:hidden}',
+    '.panel.mn .row-item .nm .l2{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:4px 6px}',
+    '.panel.mn .row-item .nm .l2 small{flex:1 1 auto;min-width:0}',
+    '.panel.mn .row-item .nm .l2 .pr{flex:none}',
+    '.mn .up,.mn .dn{white-space:nowrap}',
+    '.panel.mn .row-item .nm .n.wrap{white-space:normal;word-break:keep-all;overflow-wrap:anywhere}',
     '.mn .roombtn{width:100%;min-height:62px;margin-bottom:12px;font-size:19px;border-radius:22px}'
   ].join('\n');
   document.head.appendChild(st);
+})();
+/* 行の名前を 1行に おさめる: はみ出したら 字を 1px ずつ 小さく(17px まで)。それでも 入らなければ 折りかえす */
+function fitNames(root) {
+  (root || ui).querySelectorAll('.row-item .nm .n:not(.fit)').forEach(function (n) {
+    if (!n.clientWidth) return;   // まだ 見えていない
+    n.classList.add('fit'); n.style.fontSize = '';
+    var fs = parseFloat(getComputedStyle(n).fontSize) || 20;
+    while (n.scrollWidth > n.clientWidth + 1 && fs > 17) { fs -= 1; n.style.fontSize = fs + 'px'; }
+    if (n.scrollWidth > n.clientWidth + 1) n.classList.add('wrap');
+  });
+}
+(function () {   // 行が 足されたら 次の描画で 合わせる
+  var pend = false;
+  new MutationObserver(function () { if (pend) return; pend = true; requestAnimationFrame(function () { pend = false; fitNames(); }); }).observe(ui, { childList: true, subtree: true });
 })();
 var SLOT_TINT = { head: '#ffe3ef', face: '#e6f0ff', body: '#e4f7df', rhand: '#fff0d6', lhand: '#fde7d3', cape: '#efe4ff', waist: '#e1f4f7', feet: '#fff6c9', ring: '#ffe0e0', charm: '#e8f6e9' }; // 部位ごとの うすい色
 var HERO = { name: 'へっぽこ', emoji: '🤴' };
@@ -76,7 +99,7 @@ function diffText(item) { // 買う確認窓用: いまの装備との差(文字
   return (cur ? 'いまの ' + cur.name + ' より' : 'いまは なにも つけていない') + '\n' + (s.join(' ') || 'かわらない');
 }
 function itemRow(item, right, onTap) {
-  var r = el('div', 'row-item'); r.innerHTML = '<div class="e" style="background:' + (SLOT_TINT[item.slot] || '#f3ead8') + '">' + item.look.emoji + '</div><div class="nm">' + esc(item.name) + '<small>' + SLOT_NAME[item.slot] + ' · ' + statDiff(item, item.slot) + '</small></div><div class="pr' + (right.no ? ' no' : '') + '">' + right.text + '</div>';
+  var r = el('div', 'row-item'); r.innerHTML = '<div class="e" style="background:' + (SLOT_TINT[item.slot] || '#f3ead8') + '">' + item.look.emoji + '</div><div class="nm"><span class="n">' + esc(item.name) + '</span><div class="l2"><small>' + SLOT_NAME[item.slot] + ' · ' + statDiff(item, item.slot) + '</small>' + (right.text ? '<div class="pr' + (right.no ? ' no' : '') + '">' + right.text + '</div>' : '') + '</div></div>';   // 名前は 行の幅いっぱい。値段は 2行目の右
   r.addEventListener('click', function () { AUDIO.sfx('tap'); onTap(r); }); return r;
 }
 function doEquip(item, then) {
@@ -98,7 +121,7 @@ function shopScene(shopId) {
       var pn = panel(sh.emoji + ' ' + sh.name, '「' + sh.talk.hello + '」'); this.pn = pn;
       var info = el('div', 'info'); pn.appendChild(info); var list = el('div', 'list'); pn.appendChild(list); var foot = el('div', 'foot'); pn.appendChild(foot); this.list = list;
       var selId = null, descEl = null;
-      function ownerToast(line) { toast(owner.emoji + ' ' + line, 2200); var t = ui.lastChild; if (t && t.className === 'toast') { t.style.pointerEvents = 'none'; t.style.top = '58px'; } } // 指を じゃましない。上のほうに 出す
+      function ownerToast(line) { toast(owner.emoji + ' ' + line, 2200); var t = ui.lastChild; if (t && t.className === 'toast') { t.classList.add('shoptoast'); t.style.pointerEvents = 'none'; t.style.top = '58px'; } } // 指を じゃましない。上のほうに 出す
       function refresh() { var st = heroStats(); info.innerHTML = '<span>' + sh.items.length + ' 品</span><span>いま: 攻 ' + st.atk + ' 守 ' + st.def + ' HP ' + st.hp + '</span>'; }
       function priceHtml(it) {
         if (P.equip[it.slot] === it.id) return '<span class="badge eq">そうび中</span>';
@@ -148,9 +171,17 @@ function shopScene(shopId) {
       build(); if (back) list.scrollTop = mem.top;
     },
     leave: function () { if (this.list) mem.top = this.list.scrollTop; if (this.pn) this.pn.remove(); DIALOG.close(); },
-    tap: function () { DIALOG.tap(); }, draw: drawDim
+    tap: function () { DIALOG.tap(); }, draw: drawDim, _shop: true
   };
 }
+/* 店の人の ひとこと(お知らせ)は、店と お披露目の あいだだけ。ほかの画面へ 移ったら 消す */
+(function () {
+  var goOrig = go;
+  go = function (name, arg) {
+    if (!(SCENES[name] && SCENES[name]._shop) && name !== 'showoff') ui.querySelectorAll('.toast.shoptoast').forEach(function (t) { t.remove(); });
+    return goOrig(name, arg);
+  };
+})();
 function drawDim() { SCENES.town.draw(); ctx.fillStyle = 'rgba(90,61,43,.45)'; ctx.fillRect(0, 0, W, H); }
 SCENES.weapon = shopScene('weapon'); SCENES.armor = shopScene('armor'); SCENES.accessory = shopScene('accessory'); SCENES.zakka = shopScene('zakka');
 /* お披露目は 1タップで もどる(はじめの 0.35 秒だけは 買ったときの指の はずみを よける) */
@@ -171,7 +202,7 @@ SCENES.equip = {
       var st = heroStats(); info.innerHTML = '<span>攻 ' + st.atk + '  守 ' + st.def + '</span><span>HP ' + st.hp + '  運 ' + st.luck + '</span>'; list.innerHTML = '';
       SLOTS.forEach(function (s) {
         var id = P.equip[s], it = id ? ITEMS[id] : null, r = el('div', 'row-item'); r.style.minHeight = '60px'; r.style.padding = '5px 10px'; r.style.marginBottom = '8px';
-        r.innerHTML = '<div class="e" style="font-size:24px;background:' + (SLOT_TINT[s] || '#f3ead8') + '">' + SLOT_EMOJI[s] + '</div><div class="nm" style="font-size:17px;flex:0 0 76px">' + SLOT_NAME[s] + '</div><div class="nm">' + (it ? it.look.emoji + ' ' + esc(it.name) : '<span style="opacity:.5">── なし ──</span>') + '</div><div class="pr">▶</div>';
+        r.innerHTML = '<div class="e" style="font-size:24px;background:' + (SLOT_TINT[s] || '#f3ead8') + '">' + SLOT_EMOJI[s] + '</div><div class="nm" style="font-size:17px;flex:0 0 76px">' + SLOT_NAME[s] + '</div><div class="nm">' + (it ? '<span class="n">' + it.look.emoji + ' ' + esc(it.name) + '</span>' : '<span style="opacity:.5">── なし ──</span>') + '</div><div class="pr">▶</div>';
         r.addEventListener('click', function () { AUDIO.sfx('tap'); pickFor(s); }); list.appendChild(r);
       });
     }
@@ -214,7 +245,7 @@ SCENES.party = {
       info.innerHTML = '<span>' + P.party.length + ' / 10 組</span><span>候補は 町に ' + DATA.COMPANIONS.filter(function (c) { return P.party.indexOf(c.id) < 0; }).length + ' 組</span>'; list.innerHTML = ''; buildRoles();
       if (!P.party.length) list.appendChild(el('div', 'desc', 'まだ 仲間が いない。町の 人に 話しかけてみよう。💬 の ふきだしが 出ている人が 仲間に なってくれる人。'));
       P.party.forEach(function (id, i) {
-        var c = COMPS[id], r = el('div', 'row-item prow'); r.innerHTML = '<div class="e">' + c.emoji + '</div><div class="nm">' + esc(c.name) + (c.count > 1 && c.name.indexOf(String(c.count)) < 0 ? ' ×' + c.count : '') + '<small>' + ROLE[c.battle.role] + '<br>力 ' + c.battle.power + ' · HP ' + c.battle.hp + '</small></div>';
+        var c = COMPS[id], r = el('div', 'row-item prow'); r.innerHTML = '<div class="e">' + c.emoji + '</div><div class="nm"><span class="n">' + esc(c.name) + (c.count > 1 && c.name.indexOf(String(c.count)) < 0 ? ' ×' + c.count : '') + '</span><small>' + ROLE[c.battle.role] + '<br>力 ' + c.battle.power + ' · HP ' + c.battle.hp + '</small></div>';
         var ctl = el('div', 'ctl'), ud = el('div', 'ud');
         function remove() { confirm(c.emoji + ' ' + c.name + ' を 仲間から はずす?\n(町に もどる。また さそえる)', 'はずす', 'やめる', function (ok) { if (ok) { P.party.splice(P.party.indexOf(id), 1); AUDIO.sfx('ok'); TOWN.refresh(); autosave(); build(); } }); }
         var off = btn('はずす', 'off gray', remove);

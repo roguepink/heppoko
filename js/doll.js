@@ -155,6 +155,29 @@ var DOLL = (function () {
     c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
   }
 
+  /* 頭の土台(耳・顔の丸・髪・ほっぺ)。人形と、会話の窓の小さな顔(DOLL.faceCanvas)で共通に使う */
+  function drawHeadBase(c) {
+    var hx = HEAD.x, hy = HEAD.y, hr = HEAD.r, i;
+    c.fillStyle = SKIN; c.lineWidth = 3; c.strokeStyle = SKIN_EDGE;
+    c.beginPath(); c.arc(hx - hr + 2, hy + 10, 13, 0, TAU); c.fill(); c.stroke();   // 耳
+    c.beginPath(); c.arc(hx + hr - 2, hy + 10, 13, 0, TAU); c.fill(); c.stroke();
+    c.beginPath(); c.arc(hx, hy, hr, 0, TAU); c.fill(); c.stroke();                 // 顔の丸
+    /* 髪: 頭より少し大きい丸の上半分 + 前髪のギザギザ + 横の毛(マッシュルーム) */
+    c.save();
+    c.beginPath(); c.arc(hx, hy + 2, hr + 5, 0, TAU); c.clip();
+    c.fillStyle = HAIR;
+    c.fillRect(hx - hr - 6, hy - hr - 6, (hr + 6) * 2, hr - 28);               // 上のかたまり(下端 y=hy-34。目にかぶらない高さ)
+    var bx = [-56, -28, 0, 28, 56];
+    for (i = 0; i < bx.length; i++) { c.beginPath(); c.arc(hx + bx[i], hy - 35, 16, 0, Math.PI); c.fill(); }   // 前髪の丸いギザギザ
+    RR(c, hx - hr - 6, hy - 40, 20, 54, 9, HAIR); RR(c, hx + hr - 14, hy - 40, 20, 54, 9, HAIR);            // 横の毛(耳にかかる)
+    c.fillStyle = HAIR_HI; c.beginPath(); c.ellipse(hx - 24, hy - 60, 20, 6, -0.3, 0, TAU); c.fill();     // つや
+    c.restore();
+    /* ほっぺ(ピンクの丸) → 手描きの顔。知らない表情名(絵文字)が来たら 前と同じく絵文字を貼る */
+    c.fillStyle = 'rgba(255,143,200,.55)';
+    c.beginPath(); c.arc(hx - 50, hy + 24, 12, 0, TAU); c.fill();
+    c.beginPath(); c.arc(hx + 50, hy + 24, 12, 0, TAU); c.fill();
+  }
+
   /* ---------- 人形本体 ---------- */
   function drawDoll(T, cx, cy, scale, opts) {
     opts = opts || {};
@@ -254,25 +277,8 @@ var DOLL = (function () {
 
     /* 7 頭(首を原点に傾く): 肌の丸 → 表情 → 髪 → ほっぺ → かおの装備 → 帽子 */
     c.save(); c.translate(NECK.x, NECK.y); c.rotate(pose.head); c.translate(-NECK.x, -NECK.y);
-    var hx = HEAD.x, hy = HEAD.y, hr = HEAD.r;
-    c.fillStyle = SKIN; c.lineWidth = 3; c.strokeStyle = SKIN_EDGE;
-    c.beginPath(); c.arc(hx - hr + 2, hy + 10, 13, 0, TAU); c.fill(); c.stroke();   // 耳
-    c.beginPath(); c.arc(hx + hr - 2, hy + 10, 13, 0, TAU); c.fill(); c.stroke();
-    c.beginPath(); c.arc(hx, hy, hr, 0, TAU); c.fill(); c.stroke();                 // 顔の丸
-    /* 髪: 頭より少し大きい丸の上半分 + 前髪のギザギザ + 横の毛(マッシュルーム) */
-    c.save();
-    c.beginPath(); c.arc(hx, hy + 2, hr + 5, 0, TAU); c.clip();
-    c.fillStyle = HAIR;
-    c.fillRect(hx - hr - 6, hy - hr - 6, (hr + 6) * 2, hr - 28);               // 上のかたまり(下端 y=hy-34。目にかぶらない高さ)
-    var bx = [-56, -28, 0, 28, 56], i;
-    for (i = 0; i < bx.length; i++) { c.beginPath(); c.arc(hx + bx[i], hy - 35, 16, 0, Math.PI); c.fill(); }   // 前髪の丸いギザギザ
-    RR(c, hx - hr - 6, hy - 40, 20, 54, 9, HAIR); RR(c, hx + hr - 14, hy - 40, 20, 54, 9, HAIR);            // 横の毛(耳にかかる)
-    c.fillStyle = HAIR_HI; c.beginPath(); c.ellipse(hx - 24, hy - 60, 20, 6, -0.3, 0, TAU); c.fill();     // つや
-    c.restore();
-    /* ほっぺ(ピンクの丸) → 手描きの顔。知らない表情名(絵文字)が来たら 前と同じく絵文字を貼る */
-    c.fillStyle = 'rgba(255,143,200,.55)';
-    c.beginPath(); c.arc(hx - 50, hy + 24, 12, 0, TAU); c.fill();
-    c.beginPath(); c.arc(hx + 50, hy + 24, 12, 0, TAU); c.fill();
+    var hx = HEAD.x, hy = HEAD.y, i;
+    drawHeadBase(c);
     if (FACES[face]) drawFace(c, hx, hy, face, t); else T.em(face, hx, hy + 6, 108);
     var fc = look(eq, 'face');
     if (fc) T.em(fc, hx, hy + 6, 80 * K('face'));
@@ -542,7 +548,18 @@ var DOLL = (function () {
     return canvas;
   }
 
+  /* 会話の窓の顔: 小さな canvas に へっぽこの頭だけを描いて返す(size = 表示の px) */
+  function faceCanvas(size, expr) {
+    var cv = document.createElement('canvas'), dpr = Math.min(3, window.devicePixelRatio || 1), px = Math.round(size * dpr);
+    cv.width = px; cv.height = px; cv.style.width = size + 'px'; cv.style.height = size + 'px';
+    var c = cv.getContext('2d'), k = px / 190;   // 頭(耳ふくめ 幅 約180)を枠いっぱいに
+    c.translate(px / 2, px / 2 + 4 * k); c.scale(k, k); c.translate(-HEAD.x, -HEAD.y);
+    drawHeadBase(c); drawFace(c, HEAD.x, HEAD.y, FACES[expr] ? expr : 'smile', 0);
+    return cv;
+  }
+
   return {
+    faceCanvas: faceCanvas,
     draw: function (cx, cy, scale, opts) { drawDoll(mainTools(), cx, cy, scale, opts); },
     renderPhoto: renderPhoto,
     drawPhotoFrame: drawPhotoFrame,
