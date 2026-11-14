@@ -544,7 +544,6 @@ var BATTLEUI = (function () {
   function onTap() {
     if (!S || S.mode === 'wait' || !S.cur) return;
     if (!typingDone()) { S.typing.n = S.typing.full.length; S.msgDirty = true; if (S.wait === Infinity) return; }
-    if (S.wait === Infinity) { S.wait = 0; return; } // タップ待ち(手動)は いつでも 進める(PROTECT の出来事で 止まったままに ならないように)
     if (PROTECT[S.cur.type]) return;
     S.wait = 0;
   }
