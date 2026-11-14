@@ -7,7 +7,9 @@
 var BATTLEUI = (function () {
   var BOSS_CX = 195, BOSS_CY = 200, BOSS_SIZE = 180;
   var HERO_Y = 330;                       // へっぽこの HP の行(炎の下)
-  var DOLL_X = 195, DOLL_Y = 722, DOLL_S = 0.26, PARTY_Y = 708, DOT_Y = 740; // 下の空きに へっぽこの人形と 仲間の列
+  var DOLL_X = 44, DOLL_Y = 728, DOLL_S = 0.26;   // 下の空きの 左に へっぽこの人形、右に 仲間の札(2 段)
+  var CARD_X0 = 84, CARD_X1 = 386, CARD_TOP = 670, CARD_H = 54, SUM_Y = 658; // 仲間の札の場所と「なかま のこり」の札
+  var STRIP_Y = 558, STRIP_H = 46;                // 一覧を開いたとき: 一覧の上に 小さく 仲間の列
   var MID_Y = 382;                        // 「みんなに 合計」などの数字を出す場所(ヒントの吹き出しと同じ帯。演出中は吹き出しが出ない)
   var LAYERS = ['#8a2be2', '#4a148c', '#1565c0', '#2e7d32', '#f9a825', '#ef6c00', '#c62828']; // 7 層(外から)
   // 1 つの出来事を見せる時間(秒)。設計 8-3。速さ「はやい」では ×0.5。1 ターン 5〜7 秒くらいになるよう 短め
@@ -55,13 +57,15 @@ var BATTLEUI = (function () {
   }
   function compOf(id) { for (var i = 0; i < S.st.comps.length; i++) if (S.st.comps[i].id === id) return S.st.comps[i]; return null; }
   function compIdx(id) { for (var i = 0; i < S.st.comps.length; i++) if (S.st.comps[i].id === id) return i; return -1; }
-  // 仲間の列: 人形の左に前半、右に後半(人形のうでに かからないよう まん中をあける)
-  function compX(i) {
-    var n = S.st.comps.length, L = Math.ceil(n / 2);
-    if (i < L) return 138 - 29 * (L - 1 - i);
-    return 252 + 29 * (i - L);
+  // 仲間の札: 人形の右に 2 段(5 組以下なら 1 段)。cardOf(i) = 札の左上・幅・まん中
+  function cardOf(i) {
+    var n = S.st.comps.length, rows = n <= 5 ? 1 : 2, cols = Math.max(1, Math.ceil(n / rows));
+    var w = Math.min(72, (CARD_X1 - CARD_X0) / cols), sx = CARD_X0 + ((CARD_X1 - CARD_X0) - w * cols) / 2;
+    var r = Math.floor(i / cols), c = i % cols, top = rows === 1 ? CARD_TOP + 22 : CARD_TOP + r * (CARD_H + 2);
+    return { x: sx + w * c, y: top, w: w, cx: sx + w * (c + 0.5), ey: top + 14 };
   }
-  function compY(i) { return PARTY_Y + (i % 2 ? 6 : -6); }
+  function compX(i) { return cardOf(i).cx; }
+  function compY(i) { return cardOf(i).ey; }
   function hpFace() {
     var p = S.view.bossMax ? S.shownBossHp / S.view.bossMax : 1;
     return p > 0.6 ? '😈' : p > 0.3 ? '😡' : p > 0.1 ? '😰' : '😱';
@@ -85,11 +89,23 @@ var BATTLEUI = (function () {
   function dmgFloaterAlly(target, amount, kind) {
     var x, y, size = 24;
     if (target === 'hero') { x = DOLL_X + 46; y = DOLL_Y - 70; }
-    else { var i = compIdx(target); if (i < 0) i = 0; x = compX(i); y = compY(i) - 26; size = 17; } // 仲間は絵文字の上に小さく
+    else { var i = compIdx(target); if (i < 0) i = 0; x = compX(i); y = cardOf(i).y + 34; size = 18; } // 仲間は 自分の札の中に(となりの札に かからない)
     var txtS = kind === 'miss' ? 'ミス' : (kind === 'heal' ? '+' : '') + fmtNum(amount);
-    floater({ x: x, y: y, text: txtS, size: size, grow: size, color: kind === 'heal' ? '#9df29d' : '#ff6a6a', stroke: PAL.ink, rise: target === 'hero' ? 22 : 12, bounce: true, dur: 0.9, guard: kind === 'guarded' && target === 'hero' });
+    floater({ x: x, y: y, text: txtS, size: size, grow: size, color: kind === 'heal' ? '#9df29d' : '#ff6a6a', stroke: PAL.ink, rise: target === 'hero' ? 22 : 16, bounce: true, dur: kind === 'heal' ? 1.1 : 0.9, guard: kind === 'guarded' && target === 'hero' });
   }
   function pop(id, icon) { S.pops[id] = { t: 0.6, icon: icon }; }
+  // 生きている仲間を みんな 回復(割合 pct %)。それぞれの札に 緑の +数字 を ぽよん
+  function healAllView(pct) {
+    for (var id in S.view.comps) { var v = S.view.comps[id]; if (!v.alive) continue;
+      var a = Math.min(v.maxHp - v.hp, Math.floor(v.maxHp * pct / 100)); v.hp += a; if (a > 0) dmgFloaterAlly(id, a, 'heal'); }
+  }
+  // 「○○は たおれた!」の札(画面のまん中に ぴょんと出す)
+  function downBanner(id, text) {
+    var c = compOf(id); if (!c) return;
+    var verb = /にげだした/.test(text || '') ? 'にげだした!' : 'たおれた!';
+    S.banner = { t: 0, emoji: c.emoji, name: c.name, verb: verb };
+    S.downT[id] = 0;
+  }
   function rowShake(target) { if (!reduced) S.rowShake = { target: target, t: 0.3 }; }
   function lunge(amp) { if (!reduced) S.lunge = { t: 0, amp: amp }; }
   function confetti() { for (var i = 0; i < 40; i++) S.confetti.push({ x: rnd(0, W), y: rnd(-300, -10), vy: rnd(120, 260), vx: rnd(-40, 40), e: i % 2 ? '✨' : '🎊', r: rnd(0, 6), t: 0 }); }
@@ -201,7 +217,7 @@ var BATTLEUI = (function () {
         var atxt = e.text; if (e.kind === 'heal' && e.target && e.target === e.who) { var sc0 = compOf(e.who); if (sc0) atxt = sc0.name + 'は 自分を 回復した(なむなむ) 💚'; }
         setMsg([atxt], true); pop(e.who, ICON[e.kind] || '💬');
         if (e.kind === 'guardStance') AUDIO.sfx('guard');
-        if (e.kind === 'heal') { AUDIO.sfx('heal'); if (e.target === 'all') { for (var id in S.view.comps) { var vc = S.view.comps[id]; if (vc.alive) vc.hp = Math.min(vc.maxHp, vc.hp + Math.floor(vc.maxHp * 0.2)); } } else if (e.target && e.target !== 'hero' && S.view.comps[e.target]) { var v2 = S.view.comps[e.target]; v2.hp = Math.min(v2.maxHp, v2.hp + (e.amount || 0)); dmgFloaterAlly(e.target, e.amount || 0, 'heal'); } }
+        if (e.kind === 'heal') { AUDIO.sfx('heal'); if (e.target === 'all') healAllView(20); else if (e.target && e.target !== 'hero' && S.view.comps[e.target]) { var v2 = S.view.comps[e.target]; v2.hp = Math.min(v2.maxHp, v2.hp + (e.amount || 0)); dmgFloaterAlly(e.target, e.amount || 0, 'heal'); } }
         if (e.kind === 'self') { var v3 = S.view.comps[e.who]; if (v3) v3.hp = Math.max(0, v3.hp - (e.amount || 0)); dmgFloaterAlly(e.who, e.amount || 0, 'self'); AUDIO.sfx('hurt'); }
         if (e.kind === 'bheal') { S.view.bossHp = Math.min(S.view.bossMax, S.view.bossHp + (e.amount || 0)); floater({ x: BOSS_CX, y: BOSS_CY, text: '+' + fmtNum(e.amount || 0), size: 28, grow: 28, color: '#9df29d', stroke: PAL.ink, rise: 40, dur: 0.9 }); AUDIO.sfx('heal'); }
         if (e.kind === 'buffAtk' || e.kind === 'buffDef') AUDIO.sfx('magic');
@@ -241,10 +257,10 @@ var BATTLEUI = (function () {
         e.hits.forEach(function (h) {
           applyDamageView(h); rowShake(h.target);
           if (h.target === 'hero') dmgFloaterAlly(h.target, h.amount, h.kind === 'miss' ? 'miss' : (isBig && guardN > 0 ? 'guarded' : h.kind));
-          else if (h.kind !== 'miss') { sumA += h.amount; cntA++; lastA = h; }
+          else if (h.kind !== 'miss') { sumA += h.amount; cntA++; lastA = h; var ci = compIdx(h.target); if (ci >= 0) floater({ x: compX(ci), y: cardOf(ci).y + 34, text: fmtNum(h.amount), size: 16, grow: 16, color: '#ff8a8a', stroke: PAL.ink, rise: 12, bounce: true, dur: 1.0 }); }
         });
         if (cntA >= 2) floater({ x: 195, y: MID_Y, text: 'みんなに 合計 ' + fmtNum(sumA), size: isBig ? 30 : 24, grow: isBig ? 30 : 24, color: isBig ? '#ffe066' : '#ffb3b3', stroke: PAL.ink, rise: 18, dur: 1.7 }); // 10人分の数字が 重ならないよう 1つだけ
-        else if (cntA === 1) dmgFloaterAlly(lastA.target, lastA.amount, lastA.kind);
+        // (1 組だけのときは 上の 札の数字だけで わかる)
         if (isBig) setMsg([guardN > 0 ? '🛡️ 守りの かまえで ダメージが へった!' : 'みんなに 大ダメージ!!'], false); else setMsg(['みんなに ダメージ!'], false);
         break; }
       case 'compgroup': {
@@ -262,7 +278,7 @@ var BATTLEUI = (function () {
             pop(h.who, ICON[h.kind] || '💬');
             if (h.kind === 'heal') {
               tag('heal', '💚回復');
-              if (h.target === 'all') { for (var id2 in S.view.comps) { var w2 = S.view.comps[id2]; if (w2.alive) w2.hp = Math.min(w2.maxHp, w2.hp + Math.floor(w2.maxHp * 0.2)); } }
+              if (h.target === 'all') healAllView(20);
               else if (h.target && h.target !== 'hero' && S.view.comps[h.target]) { var w3 = S.view.comps[h.target]; w3.hp = Math.min(w3.maxHp, w3.hp + (h.amount || 0)); dmgFloaterAlly(h.target, h.amount || 0, 'heal'); }
             }
             else if (h.kind === 'buffAtk') tag('atk', '🎵攻撃UP');
@@ -292,7 +308,7 @@ var BATTLEUI = (function () {
       case 'heal': {
         if (e.target === 'hero') { S.view.heroHp = Math.min(S.view.heroMax, S.view.heroHp + e.amount); dmgFloaterAlly('hero', e.amount, 'heal'); setMsg(['へっぽこの HPが ' + fmtNum(e.amount) + ' 回復!'], false); AUDIO.sfx('heal'); }
         else if (e.target === 'boss') { S.view.bossHp = Math.min(S.view.bossMax, S.view.bossHp + e.amount); floater({ x: BOSS_CX, y: BOSS_CY, text: '+' + fmtBig(e.amount), size: 30, grow: 30, color: '#9df29d', stroke: PAL.ink, rise: 40, dur: 0.9 }); setMsg(['大魔王の HPが ' + fmtBig(e.amount) + ' 回復した…'], false); AUDIO.sfx('heal'); }
-        else { var pct = parseFloat(e.amount) || 0; for (var cid in S.view.comps) { var vv = S.view.comps[cid]; if (vv.alive) vv.hp = Math.min(vv.maxHp, vv.hp + Math.floor(vv.maxHp * pct / 100)); } floater({ x: 195, y: MID_Y, text: 'みんな 回復!', size: 24, grow: 24, color: '#9df29d', stroke: PAL.ink, rise: 18, dur: 1.2 }); setMsg(['みんなの HPが 回復した!'], false); AUDIO.sfx('heal'); }
+        else { var pct = parseFloat(e.amount) || 0; healAllView(pct); floater({ x: 195, y: MID_Y, text: 'みんな 回復!', size: 24, grow: 24, color: '#9df29d', stroke: PAL.ink, rise: 18, dur: 1.2 }); setMsg(['みんなの HPが 回復した!'], false); AUDIO.sfx('heal'); }
         break; }
       case 'mood': {
         S.view.mood = e.mood; S.moodPop = 0.5;
@@ -307,8 +323,8 @@ var BATTLEUI = (function () {
       case 'shake': shake(e.power === 'big' ? 14 : 6, e.power === 'big' ? 0.6 : 0.3); S.wait = 0; break;
       case 'warn': S.warnT = 1.4; S.yellow = 1.0; AUDIO.sfx('warn'); break;
       case 'bigattack': S.view.mood = 'normal'; S.warnT = 0; flash([138, 43, 226], 0.7, 0.3); lunge(40); S.bigT = 0; AUDIO.sfx('warn'); break;
-      case 'revive': { var vr = S.view.comps[e.target]; var cr = compOf(e.target); if (vr && cr) { vr.alive = true; vr.hp = Math.floor(cr.maxHp / 2); } pop(e.target, '💚'); pop(e.who, '🙏'); setMsg([e.text], true); AUDIO.sfx('heal'); break; }
-      case 'down': { var vd = S.view.comps[e.who]; if (vd) { vd.alive = false; vd.hp = 0; } setMsg([e.text], true); AUDIO.sfx('hurt'); rowShake(e.who); break; }
+      case 'revive': { var vr = S.view.comps[e.target]; var cr = compOf(e.target); if (vr && cr) { vr.alive = true; vr.hp = Math.floor(cr.maxHp / 2); } delete S.downT[e.target]; if (S.shownC[e.target]) S.shownC[e.target].ghost = 0; dmgFloaterAlly(e.target, Math.floor((cr ? cr.maxHp : 0) / 2), 'heal'); pop(e.target, '💚'); pop(e.who, '🙏'); setMsg([e.text], true); AUDIO.sfx('heal'); break; }
+      case 'down': { var vd = S.view.comps[e.who]; if (vd) { vd.alive = false; vd.hp = 0; } downBanner(e.who, e.text); setMsg([e.text], true); AUDIO.sfx('hurt'); rowShake(e.who); break; }
       case 'end': onEnd(e.result); S.wait = 0; break;
       case 'turn': S.view = snapshot(S.st); if (e.hint) S.hint = e.hint; S.wait = 0; break;
       case 'win': S.spin = 0; flash([255, 255, 255], 0.9, 0.5); shake(20, 1.0); confetti(); AUDIO.sfx('fanfare'); AUDIO.bgm('victory'); setMsg([''], true); break;
@@ -486,7 +502,7 @@ var BATTLEUI = (function () {
       '#battle, #battle button { font-family:' + F + '; }',
       '#battle .msg { top:430px; height:130px; background:var(--cream,#fff6e6); color:var(--ink,#5a3d2b); border:3px solid var(--ink,#5a3d2b); border-radius:22px; box-shadow:0 5px 0 rgba(0,0,0,.35); padding:9px 16px; }',
       '#battle .msg .next { color:var(--pink-d,#e0609f); }',
-      '#battle.gridopen .msg { top:430px; height:86px; padding:6px 14px; font-size:17px; line-height:1.38; border-radius:18px; }',
+      '#battle.gridopen .msg { top:430px; height:66px; padding:5px 14px; font-size:17px; line-height:1.38; border-radius:18px; }',
       '#battle.gridopen .msg .next { bottom:3px; font-size:14px; }',
       '#battle .cmds button.bb { border:3px solid var(--ink,#5a3d2b); border-radius:22px; color:var(--ink,#5a3d2b); transition:transform 120ms ease-out; }',
       '#battle .cmds button.bb:active { transform:scale(.94,.88); }',
@@ -495,13 +511,13 @@ var BATTLEUI = (function () {
       '#battle .cmds button.sky { background:var(--sky,#8fd3ff); box-shadow:0 5px 0 var(--sky-d,#4fa8d8); }',
       '#battle .cmds button.spd { background:var(--cream,#fff6e6); box-shadow:0 5px 0 #c9b48f; }',
       '#battle .cmds button:disabled { background:#b9b0c9 !important; box-shadow:0 5px 0 #8a809c !important; color:#efeaf5; }',
-      '#battle.gridopen .cmds { top:524px; }',
+      '#battle.gridopen .cmds { top:504px; }',
       '#battle.gridopen .cmds button { min-height:48px; height:48px; }',
-      '#battle.gridopen .grid { top:582px; height:194px; background:var(--cream,#fff6e6); border:3px solid var(--ink,#5a3d2b); border-radius:18px; padding:6px 6px 8px; box-sizing:border-box; gap:7px; }',
+      '#battle.gridopen .grid { top:610px; height:166px; background:var(--cream,#fff6e6); border:3px solid var(--ink,#5a3d2b); border-radius:18px; padding:6px 6px 8px; box-sizing:border-box; gap:7px; }',
       '#battle .grid button { border:3px solid var(--ink,#5a3d2b); border-radius:18px; color:var(--ink,#5a3d2b); transition:transform 120ms ease-out; }',
       '#battle .grid button:active { transform:scale(.94,.88); }',
       '#battle .grid button:not(.closer) { height:auto; min-height:60px; padding:5px 8px; }',
-      '#battle .grid button.closer { background:#efe6d6; box-shadow:0 4px 0 #c9b48f; font-size:17px; min-height:40px; height:40px; }',
+      '#battle .grid button.closer { background:#efe6d6; box-shadow:0 4px 0 #c9b48f; font-size:17px; min-height:38px; height:38px; }',
       '#battle .grid .sec { color:var(--ink,#5a3d2b); border-bottom:2px dashed var(--ink,#5a3d2b); font-size:17px; }',
       '#battle .grid::-webkit-scrollbar-thumb { background:var(--pink,#ff8fc8); }',
       '#battle .hint { left:16px; top:352px; width:358px; box-sizing:border-box; text-align:left; font-size:17px; line-height:1.35; font-weight:800; color:var(--ink,#5a3d2b); text-shadow:none; background:var(--cream,#fff6e6); border:3px solid var(--ink,#5a3d2b); border-radius:18px; padding:5px 12px; box-shadow:0 4px 0 rgba(0,0,0,.35); }',
@@ -554,7 +570,7 @@ var BATTLEUI = (function () {
     return { st: null, rng: null, dom: null, view: null, shownBossHp: 0, shownHeroHp: 0, queue: [], cur: null, wait: 0, typing: null, msgLines: [], msgDirty: true,
       floaters: [], confetti: [], flash: null, shake: { amp: 0, t: 0, dur: 1 }, lunge: null, pops: {}, rowShake: null, peelT: 0, barFlash: 0, warnT: 0, yellow: 0, phaseTint: null, heroPop: 0, moodPop: 0,
       combo: null, finisherT: -1, finisherAmt: 0, finisher: null, finisherLabel: '', spin: -1, dark: -1, heroFace: '🤴', bigText: null, bigT: -1, pendingGo: null,
-      mode: 'play', gridMode: null, pinch: false, bigMove: null, hint: null, lastHeroAtk: null, result: null, resumed: false };
+      shownC: {}, downT: {}, banner: null, mode: 'play', gridMode: null, pinch: false, bigMove: null, hint: null, lastHeroAtk: null, result: null, resumed: false };
   }
 
   /* ========== 場面 ========== */
@@ -566,7 +582,8 @@ var BATTLEUI = (function () {
       if (saved && saved.st && saved.st.boss && saved.st.hero) { S.st = saved.st; S.gridMode = saved.gridMode || null; S.bigMove = saved.bigMove || null; S.resumed = true; }
       else S.st = BATTLE.newState(heroSt(), ids(), comps(), window.DATA.BOSS);
       S.rng = BATTLE.makeRng(Date.now());
-      S.view = snapshot(S.st); S.shownBossHp = S.view.bossHp; S.shownHeroHp = S.view.heroHp;
+      S.view = snapshot(S.st); S.shownBossHp = S.view.bossHp; S.shownHeroHp = S.view.heroHp; S.ghostHeroHp = S.view.heroHp;
+      for (var cid in S.view.comps) { var cv = S.view.comps[cid]; S.shownC[cid] = { hp: cv.hp, ghost: cv.hp }; if (!cv.alive) S.downT[cid] = 9; }
       buildDom();
       if (window.HUD && HUD.hide) HUD.hide();
       AUDIO.bgm('battle');
@@ -610,6 +627,15 @@ var BATTLEUI = (function () {
         if (nowL === 1 && !S.sawLast && S.mode !== 'over') { S.sawLast = true; S.queue.unshift({ type: 'say', text: 'へっぽこ「…だめです。」' }); S.queue.unshift({ type: 'say', text: '大魔王「ま、まて。ちょっと トイレに 行っていいか?」' }); } // あと 1 層の ひとこと
       }
       S.shownHeroHp = Math.abs(S.view.heroHp - S.shownHeroHp) < 0.5 ? S.view.heroHp : lerp(S.shownHeroHp, S.view.heroHp, 1 - Math.pow(0.01, dt / 0.3));
+      S.ghostHeroHp = stepGhost(S.ghostHeroHp === undefined ? S.shownHeroHp : S.ghostHeroHp, S.shownHeroHp, dt);
+      // 仲間の HP バーも するっと 動く(うすい赤の「へった分」は 少し おくれて ついてくる)
+      for (var cid2 in S.view.comps) {
+        var tv = S.view.comps[cid2], sc = S.shownC[cid2] || (S.shownC[cid2] = { hp: tv.hp, ghost: tv.hp });
+        sc.hp = Math.abs(tv.hp - sc.hp) < 0.5 ? tv.hp : lerp(sc.hp, tv.hp, 1 - Math.pow(0.01, dt / 0.35));
+        sc.ghost = stepGhost(sc.ghost, sc.hp, dt);
+      }
+      for (var did in S.downT) S.downT[did] += dt;
+      if (S.banner) { S.banner.t += dt; if (S.banner.t > 1.9) S.banner = null; }
       // ピンチの曲
       var pinch = S.view.heroHp <= S.view.heroMax * 0.25 && S.mode !== 'over';
       if (pinch !== S.pinch) { S.pinch = pinch; if (S.mode !== 'over') AUDIO.bgm(pinch ? 'pinch' : 'battle'); }
@@ -628,12 +654,15 @@ var BATTLEUI = (function () {
       if (!S) return;
       ctx.save();
       if (S.shake.t > 0 && !reduced) { var a = S.shake.amp * (S.shake.t / S.shake.dur); ctx.translate(rnd(-a, a), rnd(-a, a)); }
-      drawBg(); drawBoss(); drawHud(); if (S.dark < 0) drawAllies(); drawFloaters(); drawOverlays(); if (S.dark >= 0) drawAllies();
+      drawBg(); drawBoss(); drawHud(); if (S.dark < 0) drawAllies(); drawFloaters(); drawBanner(); drawOverlays(); if (S.dark >= 0) drawAllies();
       ctx.restore();
     },
     tap: function () { onTap(); },
     key: function (k) { if (k === ' ' || k === 'Enter') onTap(); }
   };
+
+  // へった分(うすい赤)は いまの分より ゆっくり 追いつく。ふえたときは すぐ 合わせる
+  function stepGhost(g, hp, dt) { if (g <= hp) return hp; return Math.max(hp, g - Math.max(1, (g - hp)) * Math.min(1, dt * 3.2)); }
 
   /* ========== 描く ========== */
   function drawBg() {
@@ -697,45 +726,120 @@ var BATTLEUI = (function () {
     if (S.barFlash > 0) rrect(bx, by, bw, bh, 8, 'rgba(255,255,255,' + (S.barFlash / 0.15 * 0.9).toFixed(2) + ')');
     txt('あと ' + k + ' 層', bx + 4, by + bh + 10, 17, '#ffe9b3', 'left', 800, null);
   }
-  function hpColor(p) { return p > 0.5 ? '#2e7d32' : p > 0.25 ? '#f9a825' : '#c62828'; }
+  function hpColor(p) { return p > 0.5 ? '#46c84a' : p > 0.3 ? '#ffcf33' : '#ff4d4d'; } // 緑 → 黄 → 赤
+  // HP バー(地・へった分・いまの分・白い縁)。blink = 3 割以下で 点滅
+  function hpBar(x, y, w, h, hp, ghost, max, blink) {
+    var q = max ? clamp(hp / max, 0, 1) : 0, g = max ? clamp(ghost / max, 0, 1) : 0, r = h / 2;
+    rrect(x, y, w, h, r, '#2a1f3d');
+    ctx.save(); rrect(x, y, w, h, r, null); ctx.clip();
+    if (g > q) { ctx.fillStyle = '#ffb3b3'; ctx.fillRect(x + w * q, y, w * (g - q), h); }
+    if (q > 0) { ctx.fillStyle = blink && Math.floor(G.t * 4) % 2 === 0 ? '#ffd0d0' : hpColor(q); ctx.fillRect(x, y, w * q, h); ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(x, y + 1, w * q, Math.max(1, h * 0.3)); }
+    ctx.restore();
+    rrect(x, y, w, h, r, null, '#fff', 2);
+  }
+  // 灰色の絵文字(たおれた仲間)。canvas の filter を使わず 色の合成で 灰色にする(古い iPhone でも 灰色になる)
+  var greyCache = {};
+  function greyCan(e) {
+    if (greyCache[e]) return greyCache[e];
+    var c = document.createElement('canvas'); c.width = c.height = 72; var g = c.getContext('2d');
+    g.font = '56px ' + EMOJI_FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(e, 36, 39);
+    try { g.globalCompositeOperation = 'saturation'; g.fillStyle = '#7d7d7d'; g.fillRect(0, 0, 72, 72); g.globalCompositeOperation = 'destination-in'; g.fillText(e, 36, 39); g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(0, 0, 72, 72); } catch (er) {}
+    greyCache[e] = c; return c;
+  }
+  // 仲間の絵文字(生き・たおれ)。たおれた瞬間は ぴょんと 跳ねてから 横に たおれる
+  function drawCompEmoji(c, x, y, size, alive, dt) {
+    if (alive) { ATL.draw(c.emoji, x, y, size); return; }
+    var t = dt === undefined ? 9 : dt, dy = 6, rot = Math.PI / 2, grey = true;
+    if (!reduced && t < 0.22) { dy = -18 * Math.sin(Math.PI / 2 * t / 0.22); rot = 0; grey = false; }
+    else if (!reduced && t < 0.55) { var u = (t - 0.22) / 0.33; dy = -18 + 24 * u * u; rot = Math.PI / 2 * u; }
+    ctx.save(); ctx.translate(x, y + dy); ctx.rotate(rot);
+    if (grey) { var s = size * 72 / 56; ctx.drawImage(greyCan(c.emoji), -s / 2, -s / 2, s, s); }
+    else ATL.draw(c.emoji, 0, 0, size);
+    ctx.restore();
+  }
+  function aliveCount() { var n = 0; S.st.comps.forEach(function (c) { var v = S.view.comps[c.id]; if (v && v.alive) n++; }); return n; }
+  function pill(label, x, y, size, fg, bg, edge, pad) {
+    ctx.font = '900 ' + size + 'px ' + TEXT_FONT; var w = ctx.measureText(label).width + (pad === undefined ? 22 : pad);
+    rrect(x - w / 2, y - size * 0.75, w, size * 1.5, size * 0.75, bg, edge, 2); txt(label, x, y + 1, size, fg, 'center', 900, null);
+  }
   function drawAllies() {
-    // へっぽこの HP の行(炎の下)
-    var p = S.view.heroMax ? S.shownHeroHp / S.view.heroMax : 0;
-    ATL.draw(S.heroFace, 24, HERO_Y, 30);
-    txt('へっぽこ', 44, HERO_Y, 17, '#fff', 'left', 900, null);
-    rrect(124, HERO_Y - 8, 148, 16, 8, '#3a2d55');
-    if (p > 0) { var blink = p <= 0.3 && Math.floor(G.t * 4) % 2 === 0; rrect(124, HERO_Y - 8, 148 * clamp(p, 0, 1), 16, 8, blink ? '#ff6a6a' : hpColor(p)); }
-    rrect(124, HERO_Y - 8, 148, 16, 8, null, '#fff', 2);
-    if (p <= 0.15 && p > 0 && Math.floor(G.t * 3) % 2 === 0) txt('ピンチ!', 198, HERO_Y, 15, '#ff6a6a', 'center', 900, '#fff');
-    txt(Math.ceil(S.shownHeroHp) + '/' + S.view.heroMax, 278, HERO_Y, 17, '#fff', 'left', 900, null);
-    // 下の空き: 床の光
-    ctx.save(); ctx.globalAlpha = 0.5; ctx.fillStyle = '#5b3a8a'; ctx.beginPath(); ctx.ellipse(195, 760, 190, 22, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-    // へっぽこの人形(まん中)
+    // ===== へっぽこの HP の行(炎の下・横いっぱいの札) =====
+    var p = S.view.heroMax ? S.shownHeroHp / S.view.heroMax : 0, low = p <= 0.3 && S.view.heroHp > 0, on = Math.floor(G.t * 4) % 2 === 0;
+    rrect(8, HERO_Y - 17, 374, 34, 17, 'rgba(27,20,48,.82)', low && on ? '#ff4d4d' : 'rgba(255,246,230,.75)', low ? 3 : 2);
+    ATL.draw(S.view.heroHp <= 0 ? '😵' : low ? '😰' : S.heroFace, 27, HERO_Y, 26);
+    if (low) { var sw0 = (G.t * 0.9) % 1; ATL.draw('💦', 40, HERO_Y - 12 + sw0 * 10, 16, 1 - sw0 * 0.6); }
+    txt('へっぽこ', 44, HERO_Y + 1, 17, '#fff', 'left', 900, null);
+    hpBar(118, HERO_Y - 10, 148, 20, S.shownHeroHp, S.ghostHeroHp === undefined ? S.shownHeroHp : S.ghostHeroHp, S.view.heroMax, low);
+    if (p <= 0.25 && p > 0 && Math.floor(G.t * 3) % 2 === 0) txt('ピンチ!', 192, HERO_Y + 1, 16, '#ff4d4d', 'center', 900, '#fff');
+    txt(Math.ceil(S.shownHeroHp) + '/' + S.view.heroMax, 376, HERO_Y + 1, 18, low ? '#ffb3b3' : '#fff', 'right', 900, null);
+    var gridOpen = S.dom && S.dom.root.classList.contains('gridopen') && S.mode === 'wait';
+    // ===== 下の空き: 床の光と へっぽこの人形(左) =====
+    ctx.save(); ctx.globalAlpha = 0.5; ctx.fillStyle = '#5b3a8a'; ctx.beginPath(); ctx.ellipse(DOLL_X, 772, 40, 9, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
     if (window.DOLL && DOLL.draw) {
       var hx = 0; if (S.rowShake && S.rowShake.target === 'hero') hx = Math.sin(S.rowShake.t * 60) * 6;
-      var pose = S.result === 'win' ? 'jump' : S.heroPop > 0 ? 'hero' : S.view.heroHp <= S.view.heroMax * 0.25 ? 'normal' : 'normal';
+      var pose = S.result === 'win' ? 'jump' : S.heroPop > 0 ? 'hero' : 'normal';
       var face = S.dark >= 0 || S.view.heroHp <= 0 ? '😵' : S.result === 'win' ? '😆' : S.view.heroHp <= S.view.heroMax * 0.25 ? '😰' : (S.view.mood === 'charge' ? '😨' : null);
       var ds = DOLL_S * (S.heroPop > 0 ? 1 + 0.12 * (S.heroPop / 0.3) : 1);
       try { DOLL.draw(DOLL_X + hx, DOLL_Y, ds, { pose: pose, face: face || undefined, noEmpty: true }); } catch (e) {}
     } else ATL.draw(S.heroFace, DOLL_X, DOLL_Y, 48);
-    // 仲間(人形の左右)
+    if (gridOpen) { drawStrip(); return; }
+    // ===== 「なかま のこり 7/10」 =====
+    var n = S.st.comps.length, al = aliveCount();
+    if (n) pill('なかま のこり ' + al + '/' + n, (CARD_X0 + CARD_X1) / 2, SUM_Y - (n <= 5 ? -12 : 0), 17, al <= Math.ceil(n * 0.3) ? '#fff' : '#5a3d2b', al <= Math.ceil(n * 0.3) ? '#c62828' : '#fff6e6', '#5a3d2b');
+    // ===== 仲間の札(絵文字・HP バー・数字 or 人数 or 「ダウン」) =====
     S.st.comps.forEach(function (c, i) {
-      var v = S.view.comps[c.id] || { hp: c.hp, maxHp: c.maxHp, alive: c.alive, count: c.count };
-      var x = compX(i), y = compY(i), dx = 0; if (S.rowShake && S.rowShake.target === c.id) dx = Math.sin(S.rowShake.t * 60) * 6;
-      var pp = S.pops[c.id], sc = pp && pp.t > 0.4 ? 1 + 0.3 * ((pp.t - 0.4) / 0.2) : 1;
-      var bob = v.alive ? Math.sin(G.t * 3 + i) * 2 : 0;
-      if (!v.alive) { ATL.draw('😵', x + dx, y, 26, 0.55); }
+      var v = S.view.comps[c.id] || { hp: c.hp, maxHp: c.maxHp, alive: c.alive, count: c.count }, sc = S.shownC[c.id] || { hp: v.hp, ghost: v.hp };
+      var k = cardOf(i), dx = 0; if (S.rowShake && S.rowShake.target === c.id) dx = Math.sin(S.rowShake.t * 60) * 6;
+      var q = v.maxHp ? sc.hp / v.maxHp : 0, lowc = v.alive && q <= 0.3, dt = S.downT[c.id];
+      var justDown = !v.alive && dt !== undefined && dt < 0.8;
+      rrect(k.x + 2 + dx, k.y, k.w - 4, CARD_H - 2, 10, v.alive ? 'rgba(255,255,255,.10)' : 'rgba(0,0,0,.45)', justDown && Math.floor(dt * 10) % 2 === 0 ? '#ff4d4d' : (v.alive ? 'rgba(255,255,255,.28)' : 'rgba(255,90,90,.55)'), 1.5);
+      var pp = S.pops[c.id], sz = pp && pp.t > 0.4 ? 1 + 0.3 * ((pp.t - 0.4) / 0.2) : 1, bob = v.alive ? Math.sin(G.t * 3 + i) * 1.5 : 0;
+      drawCompEmoji(c, k.cx + dx, k.ey + bob, 26 * sz, v.alive, dt);
+      if (!v.alive && (dt === undefined || dt > 0.5)) ATL.draw('💫', k.cx + dx + Math.sin(G.t * 4) * 3, k.y + 5, 16);
+      if (lowc) { var sw = (G.t * 0.9 + i * 0.13) % 1; ATL.draw('💦', k.cx - 15 + dx, k.ey - 8 + sw * 9, 15, 1 - sw * 0.6); }
+      if (pp) ATL.draw(pp.icon, k.cx + k.w / 2 - 12 + dx, k.y + 7, 17);
+      var bw = k.w - 12;
+      hpBar(k.cx - bw / 2 + dx, k.y + 27, bw, 9, v.alive ? sc.hp : 0, v.alive ? sc.ghost : Math.max(0, sc.ghost), v.maxHp, lowc);
+      if (!v.alive) { pill('ダウン', k.cx + dx, k.y + 45, 15, '#fff', '#c62828', null, 8); }
       else {
-        ATL.draw(c.emoji, x + dx, y + bob, 30 * sc);
-        if (v.count >= 2) { var n = Math.max(1, Math.ceil(v.count * v.hp / v.maxHp)); txt(n >= 1000 ? Math.floor(n / 1000) + 'k' : String(n), x + 15, y + 12, 15, '#ffe066', 'right', 900, PAL.ink); }
+        var label;
+        if (v.count >= 2) { var ppl = Math.max(1, Math.ceil(v.count * sc.hp / v.maxHp)); label = (ppl >= 10000 ? Math.floor(ppl / 10000) + '万' : ppl) + (c.emoji === '🐩' ? '匹' : '人'); }
+        else label = String(Math.ceil(sc.hp));
+        txt(label, k.cx + dx, k.y + 45, 15, v.count >= 2 ? '#ffe066' : (lowc ? '#ffb3b3' : '#fff'), 'center', 900, '#1b1430');
       }
-      if (pp) ATL.draw(pp.icon, x + 13, y - 19, 20);
-      // HP の点
-      var q = v.maxHp ? v.hp / v.maxHp : 0;
-      ctx.beginPath(); ctx.arc(x, DOT_Y + (i % 2 ? 6 : 0), 5, 0, Math.PI * 2);
-      if (!v.alive) { ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#000'; ctx.stroke(); }
-      else { ctx.fillStyle = hpColor(q); ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.stroke(); }
     });
+  }
+  // 一覧を開いているとき: 一覧の上に 小さな 仲間の列(絵文字と HP バーだけ)
+  function drawStrip() {
+    var n = S.st.comps.length; if (!n) return;
+    var al = aliveCount(), warn = al <= Math.ceil(n * 0.3);
+    rrect(8, STRIP_Y, 374, STRIP_H, 14, 'rgba(27,20,48,.92)', 'rgba(255,246,230,.75)', 2);
+    txt('なかま', 36, STRIP_Y + 14, 15, '#fff', 'center', 900, null);
+    txt(al + '/' + n, 36, STRIP_Y + 33, 18, warn ? '#ff8080' : '#ffe066', 'center', 900, null);
+    var x0 = 66, w = Math.min(44, (380 - x0) / n);
+    S.st.comps.forEach(function (c, i) {
+      var v = S.view.comps[c.id] || { hp: c.hp, maxHp: c.maxHp, alive: c.alive }, sc = S.shownC[c.id] || { hp: v.hp, ghost: v.hp };
+      var cx = x0 + w * (i + 0.5), q = v.maxHp ? sc.hp / v.maxHp : 0;
+      drawCompEmoji(c, cx, STRIP_Y + 14 + (v.alive ? 0 : -4), 20, v.alive, S.downT[c.id]);
+      hpBar(cx - (w - 6) / 2, STRIP_Y + 30, w - 6, 9, v.alive ? sc.hp : 0, v.alive ? sc.ghost : 0, v.maxHp, v.alive && q <= 0.3);
+      if (!v.alive) { ctx.strokeStyle = '#ff4d4d'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(cx - 8, STRIP_Y + 6); ctx.lineTo(cx + 8, STRIP_Y + 22); ctx.moveTo(cx + 8, STRIP_Y + 6); ctx.lineTo(cx - 8, STRIP_Y + 22); ctx.stroke(); }
+    });
+  }
+  // 「○○は たおれた!」の札(ぴょんと出て、少しして 消える)
+  function drawBanner() {
+    var b = S.banner; if (!b) return;
+    var t = b.t, sc = reduced ? 1 : (t < 0.18 ? 0.4 + 0.75 * (t / 0.18) : 1 + 0.15 * Math.exp(-(t - 0.18) * 8) * Math.cos((t - 0.18) * 30)), al = t > 1.5 ? clamp((1.9 - t) / 0.4, 0, 1) : 1;
+    ctx.save(); ctx.globalAlpha = al; ctx.translate(195, MID_Y); ctx.scale(sc, sc);
+    rrect(-170, -34, 340, 68, 20, '#fff6e6', '#5a3d2b', 3);
+    ATL.draw('🪦', -136, 0, 36);
+    var nm = b.name, fs = 20; ctx.font = '900 ' + fs + 'px ' + TEXT_FONT;
+    while (ctx.measureText(nm + 'は').width > 270 && fs > 17) { fs--; ctx.font = '900 ' + fs + 'px ' + TEXT_FONT; }
+    while (ctx.measureText(nm + '…は').width > 270 && nm.length > 4) nm = nm.slice(0, -1);
+    nm = (nm === b.name ? nm : nm + '…') + 'は';
+    txt(nm, -110, -12, fs, '#5a3d2b', 'left', 900, null);
+    txt(b.verb, -110, 15, 22, '#d32f2f', 'left', 900, null);
+    ATL.draw(b.emoji, 140, 0, 30);
+    ctx.restore();
   }
   function drawFloaters() {
     S.floaters.forEach(function (f) {
