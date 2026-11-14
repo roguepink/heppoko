@@ -32,15 +32,14 @@ function removeItem(id) { var i = P.items.indexOf(id); if (i >= 0) P.items.splic
 var HUD = (function () {
   var node = el('div', 'hidden'); node.id = 'hud';
   var money = el('span', 'money', ''), place = el('span', 'place', ''), diff = el('span', 'mdiff', '');
-  var gear = btn('⚙️', 'small lav', function () { openSettings(); }); gear.style.cssText = 'flex:none;min-height:44px;height:44px;width:44px;padding:0;font-size:20px;border-radius:50%;box-shadow:0 3px 0 var(--lav-d)';
+  var gear = btn('⚙️', 'small lav', function () { openSettings(); }); gear.style.cssText = 'flex:none;min-height:40px;width:44px;padding:0;font-size:18px;box-shadow:none;border-width:2px';
   var right = el('div', '', ''); right.style.cssText = 'display:flex;align-items:center;gap:8px;min-width:0'; right.appendChild(place); right.appendChild(gear);
   node.appendChild(money); node.appendChild(right); node.appendChild(diff); ui.appendChild(node);
   var shown = 0, target = 0, anim = null;
   function update(delta) {
     if (!P) return; target = P.money;
-    if (delta) { diff.textContent = (delta > 0 ? '+' : '−') + fmtG(Math.abs(delta)); diff.style.color = delta > 0 ? '#2e9d4a' : '#c62828'; diff.style.opacity = '1'; diff.style.transform = 'translateY(0)';
+    if (delta) { diff.textContent = (delta > 0 ? '+' : '−') + fmtG(Math.abs(delta)); diff.style.color = delta > 0 ? PAL.leaf : PAL.red; diff.style.opacity = '1'; diff.style.transform = 'translateY(0)';
       setTimeout(function () { diff.style.opacity = '0'; diff.style.transform = 'translateY(-20px)'; }, 900); }
-    if (delta) { money.classList.remove('boing'); void money.offsetWidth; money.classList.add('boing'); } // お金が変わったら 札が ぽよん と弾む
     if (anim) clearInterval(anim); var start = shown, t0 = Date.now();
     anim = setInterval(function () { var k = Math.min(1, (Date.now() - t0) / 500); shown = Math.round(lerp(start, target, k)); money.textContent = '💰 ' + fmtG(shown); if (k >= 1) { clearInterval(anim); anim = null; } }, 30);
     if (!delta) { clearInterval(anim); anim = null; shown = target; money.textContent = '💰 ' + fmtG(shown); } // 差分なし = すぐ表示(0.5 秒ぐるぐるしない)
@@ -65,11 +64,10 @@ var DIALOG = (function () {
   node.appendChild(who); node.appendChild(body); node.appendChild(next); node.appendChild(choices); ui.appendChild(node);
   node.addEventListener('click', function () { tap(); }); // 窓そのものを タップしても 進む
   var lines = [], idx = 0, full = '', shownN = 0, timer = null, doneAt = 0, cb = null, active = false, choosing = false;
-  function speedMs() { return [0, 24, 12, 6][SETTINGS.textSpeed || 2]; } // ふつう = 12ms(前は 25ms)
-  function whoHtml(w) { return w ? '<span class="face">' + esc(w.emoji || '') + '</span>' + (w.name ? '<span class="nm">' + esc(w.name) + '</span>' : '') : ''; }
+  function speedMs() { return [0, 40, 25, 10][SETTINGS.textSpeed || 2]; }
   function start(w, ls, done) {
     lines = ls.slice(); idx = 0; cb = done || null; active = true; choosing = false; node.classList.remove('danger'); hide(choices); choices.innerHTML = '';
-    who.innerHTML = whoHtml(w); who.style.display = w ? 'flex' : 'none';
+    who.innerHTML = w ? '<span class="face">' + esc(w.emoji || '') + '</span>' + esc(w.name || '') : ''; who.style.display = w ? 'flex' : 'none';
     show(node); showLine();
   }
   function showLine() {
@@ -80,17 +78,15 @@ var DIALOG = (function () {
   function tap() {
     if (!active) return false;
     if (choosing) { if (timer) { clearInterval(timer); timer = null; shownN = full.length; body.textContent = full; show(choices); } return true; } // 選択肢つき: タップで文を全部出す
-    if (timer) {
-      if (shownN * 2 < full.length) { clearInterval(timer); timer = null; shownN = full.length; body.textContent = full; doneAt = Date.now(); show(next); return true; } // 出はじめは 文を全部出す
-      clearInterval(timer); timer = null; // 半分以上 出ていたら、そのまま 次の行へ(2回 タップしなくていい)
-    } else if (Date.now() - doneAt < 120) return true;
+    if (timer) { clearInterval(timer); timer = null; shownN = full.length; body.textContent = full; doneAt = Date.now(); show(next); return true; }
+    if (Date.now() - doneAt < 120) return true;
     idx++;
     if (idx < lines.length) showLine(); else { active = false; hide(node); var c = cb; cb = null; if (c) c(); }
     return true;
   }
   function askChoices(w, text, list) {
     lines = [text]; idx = 0; active = true; choosing = true; cb = null; node.classList.remove('danger');
-    who.innerHTML = whoHtml(w); who.style.display = w ? 'flex' : 'none';
+    who.innerHTML = w ? '<span class="face">' + esc(w.emoji || '') + '</span>' + esc(w.name || '') : ''; who.style.display = w ? 'flex' : 'none';
     show(node); hide(next); choices.innerHTML = ''; choices.className = 'choices hidden' + (list.length === 2 ? ' two' : ''); // 文が出おわるまで ボタンは隠す
     list.forEach(function (c) { var b = btn(c.label, c.cls || '', function () { active = false; choosing = false; hide(node); hide(choices); c.fn && c.fn(); }); if (c.disabled) b.disabled = true; choices.appendChild(b); });
     full = text; shownN = 0; body.textContent = '';
