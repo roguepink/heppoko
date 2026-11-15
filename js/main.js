@@ -9,7 +9,7 @@ var SLOTS = ['head', 'face', 'body', 'rhand', 'lhand', 'cape', 'waist', 'feet', 
 var SLOT_NAME = { head: 'あたま', face: 'かお', body: 'からだ', rhand: 'みぎて', lhand: 'ひだりて', cape: 'マント', waist: 'こし', feet: 'あし', ring: 'ゆびわ', charm: 'おまもり' };
 var SLOT_EMOJI = { head: '👒', face: '👓', body: '👕', rhand: '🫱', lhand: '🫲', cape: '🧣', waist: '👖', feet: '👟', ring: '💍', charm: '📿' };
 /* 家の中にいる人(町のマップには出さない) */
-var INTERIOR = { king: 'castle', princess: 'castle', mama: 'home', papa: 'home', shop_weapon: 'weapon', shop_armor: 'armor', shop_acc: 'accessory', shop_zakka: 'zakka' };
+var INTERIOR = { king: 'castle', princess: 'castle', mama: 'home', papa: 'home', shop_weapon: 'weapon', shop_armor: 'armor', shop_acc: 'accessory', shop_zakka: 'zakka', shoukai: 'shoukai' };
 COMPS.aunt.where = null; // おばさんは自分の家の中
 
 var P = null;
@@ -32,14 +32,15 @@ function removeItem(id) { var i = P.items.indexOf(id); if (i >= 0) P.items.splic
 var HUD = (function () {
   var node = el('div', 'hidden'); node.id = 'hud';
   var money = el('span', 'money', ''), place = el('span', 'place', ''), diff = el('span', 'mdiff', '');
-  var gear = btn('⚙️', 'small lav', function () { openSettings(); }); gear.style.cssText = 'flex:none;min-height:40px;width:44px;padding:0;font-size:18px;box-shadow:none;border-width:2px';
+  var gear = btn('⚙️', 'small lav', function () { openSettings(); }); gear.style.cssText = 'flex:none;min-height:44px;height:44px;width:44px;padding:0;font-size:20px;border-radius:50%;box-shadow:0 3px 0 var(--lav-d)';
   var right = el('div', '', ''); right.style.cssText = 'display:flex;align-items:center;gap:8px;min-width:0'; right.appendChild(place); right.appendChild(gear);
   node.appendChild(money); node.appendChild(right); node.appendChild(diff); ui.appendChild(node);
   var shown = 0, target = 0, anim = null;
   function update(delta) {
     if (!P) return; target = P.money;
-    if (delta) { diff.textContent = (delta > 0 ? '+' : '−') + fmtG(Math.abs(delta)); diff.style.color = delta > 0 ? PAL.leaf : PAL.red; diff.style.opacity = '1'; diff.style.transform = 'translateY(0)';
+    if (delta) { diff.textContent = (delta > 0 ? '+' : '−') + fmtG(Math.abs(delta)); diff.style.color = delta > 0 ? '#2e9d4a' : '#c62828'; diff.style.opacity = '1'; diff.style.transform = 'translateY(0)';
       setTimeout(function () { diff.style.opacity = '0'; diff.style.transform = 'translateY(-20px)'; }, 900); }
+    if (delta) { money.classList.remove('boing'); void money.offsetWidth; money.classList.add('boing'); } // お金が変わったら 札が ぽよん と弾む
     if (anim) clearInterval(anim); var start = shown, t0 = Date.now();
     anim = setInterval(function () { var k = Math.min(1, (Date.now() - t0) / 500); shown = Math.round(lerp(start, target, k)); money.textContent = '💰 ' + fmtG(shown); if (k >= 1) { clearInterval(anim); anim = null; } }, 30);
     if (!delta) { clearInterval(anim); anim = null; shown = target; money.textContent = '💰 ' + fmtG(shown); } // 差分なし = すぐ表示(0.5 秒ぐるぐるしない)
@@ -64,10 +65,18 @@ var DIALOG = (function () {
   node.appendChild(who); node.appendChild(body); node.appendChild(next); node.appendChild(choices); ui.appendChild(node);
   node.addEventListener('click', function () { tap(); }); // 窓そのものを タップしても 進む
   var lines = [], idx = 0, full = '', shownN = 0, timer = null, doneAt = 0, cb = null, active = false, choosing = false;
-  function speedMs() { return [0, 40, 25, 10][SETTINGS.textSpeed || 2]; }
+  function speedMs() { return [0, 24, 12, 6][SETTINGS.textSpeed || 2]; } // ふつう = 12ms(前は 25ms)
+  function whoHtml(w) { return w ? '<span class="face">' + esc(w.emoji || '') + '</span>' + (w.name ? '<span class="nm">' + esc(w.name) + '</span>' : '') : ''; }
+  /* へっぽこが話すときは 顔の丸に 手描きの顔(DOLL.faceCanvas)を描く。町の人は 絵文字のまま */
+  function setWho(w) {
+    who.innerHTML = whoHtml(w); who.style.display = w ? 'flex' : 'none';
+    if (w && w.name === 'へっぽこ' && window.DOLL && DOLL.faceCanvas) {
+      var f = who.querySelector('.face'); if (f) { f.textContent = ''; f.style.overflow = 'hidden'; f.style.background = '#fff6e6'; f.appendChild(DOLL.faceCanvas(50, w.expr || 'smile')); }
+    }
+  }
   function start(w, ls, done) {
     lines = ls.slice(); idx = 0; cb = done || null; active = true; choosing = false; node.classList.remove('danger'); hide(choices); choices.innerHTML = '';
-    who.innerHTML = w ? '<span class="face">' + esc(w.emoji || '') + '</span>' + esc(w.name || '') : ''; who.style.display = w ? 'flex' : 'none';
+    setWho(w);
     show(node); showLine();
   }
   function showLine() {
@@ -78,15 +87,17 @@ var DIALOG = (function () {
   function tap() {
     if (!active) return false;
     if (choosing) { if (timer) { clearInterval(timer); timer = null; shownN = full.length; body.textContent = full; show(choices); } return true; } // 選択肢つき: タップで文を全部出す
-    if (timer) { clearInterval(timer); timer = null; shownN = full.length; body.textContent = full; doneAt = Date.now(); show(next); return true; }
-    if (Date.now() - doneAt < 120) return true;
+    if (timer) {
+      if (shownN * 2 < full.length) { clearInterval(timer); timer = null; shownN = full.length; body.textContent = full; doneAt = Date.now(); show(next); return true; } // 出はじめは 文を全部出す
+      clearInterval(timer); timer = null; // 半分以上 出ていたら、そのまま 次の行へ(2回 タップしなくていい)
+    } else if (Date.now() - doneAt < 120) return true;
     idx++;
     if (idx < lines.length) showLine(); else { active = false; hide(node); var c = cb; cb = null; if (c) c(); }
     return true;
   }
   function askChoices(w, text, list) {
     lines = [text]; idx = 0; active = true; choosing = true; cb = null; node.classList.remove('danger');
-    who.innerHTML = w ? '<span class="face">' + esc(w.emoji || '') + '</span>' + esc(w.name || '') : ''; who.style.display = w ? 'flex' : 'none';
+    setWho(w);
     show(node); hide(next); choices.innerHTML = ''; choices.className = 'choices hidden' + (list.length === 2 ? ' two' : ''); // 文が出おわるまで ボタンは隠す
     list.forEach(function (c) { var b = btn(c.label, c.cls || '', function () { active = false; choosing = false; hide(node); hide(choices); c.fn && c.fn(); }); if (c.disabled) b.disabled = true; choices.appendChild(b); });
     full = text; shownN = 0; body.textContent = '';
@@ -122,44 +133,104 @@ function battleInProgress() { // つづけてよい途中データがあるか(�
   return true;
 }
 /* ---------- タイトル ---------- */
+function easeBack(x) { x = clamp(x, 0, 1); var c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); }
+function titleCatch() { // ひとこと(係Eが DATA.TEXTS に入れる。なければ この文)
+  var T = DATA.TEXTS || {}, t = T.title || {};
+  return T.titleCopy || t.catch || t.tagline || t.copy || T.catchcopy || T.tagline || T.titleCatch || '勇者は いくらで 買えますか?';
+}
+function waveText(s, d0) { // 1字ずつ 波打つ
+  var h = '', k = 0; for (var i = 0; i < s.length; i++) { var ch = s.charAt(i); if (ch === '\n') { h += '<br>'; continue; } h += '<span class="w" style="animation-delay:' + ((d0 || 0) + k * 0.1).toFixed(2) + 's">' + esc(ch) + '</span>'; k++; }
+  return h;
+}
+/* あたたかい クリーム地 + ふんわり光の筋 + 水玉(タイトル・おしまい 共通) */
+function drawWarmBg(cy) {
+  var g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#fff3d6'); g.addColorStop(1, '#ffe2bf'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.save(); ctx.translate(195, cy); ctx.rotate(G.t * 0.12); ctx.fillStyle = 'rgba(255,216,77,.22)';
+  for (var i = 0; i < 12; i++) { ctx.rotate(Math.PI / 6); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(700, -70); ctx.lineTo(700, 70); ctx.closePath(); ctx.fill(); }
+  ctx.restore();
+  ctx.fillStyle = 'rgba(255,143,200,.16)';
+  for (i = 0; i < 18; i++) { var x = (i * 89) % W, y = (i * 137 + 40) % H, r = 8 + (i % 4) * 5; ctx.beginPath(); ctx.arc(x, y + Math.sin(G.t + i) * 4, r, 0, Math.PI * 2); ctx.fill(); }
+}
 SCENES.title = {
   enter: function () {
-    HUD.hide(); AUDIO.bgm(null);
-    var t = el('div', ''); t.id = 'title'; this.node = t;
-    t.appendChild(el('div', 'emo', '🏰 ⚔️ 💰'));
-    t.appendChild(el('h1', '', '勇者へっぽこの<br>小さな冒険<small>〜 お金の力で 大魔王を 〜</small>'));
+    HUD.hide(); AUDIO.bgm(null); this.t0 = G.t;
+    var t = el('div', 'top'); t.id = 'title'; this.node = t;
+    t.appendChild(el('h1', '', waveText('勇者へっぽこの\n小さな冒険', 0) + '<small>〜 お金の力で 大魔王を 〜</small>'));
+    t.appendChild(el('div', 'catch', esc(titleCatch())));
     var sv = loadSave();
     t.appendChild(btn('はじめから', 'main', function () { AUDIO.unlock(); if (sv) confirm('いまの セーブデータは 消えます。いい?', '消して はじめる', 'やめる', function (ok) { if (ok) startNew(); }); else startNew(); }));
     if (sv) { var d = new Date(sv.time || 0), lab = 'つづきから <small style="display:block;font-size:13px;font-weight:800;white-space:nowrap">(' + (d.getMonth() + 1) + '/' + d.getDate() + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ' に セーブ)</small>'; t.appendChild(btn(lab, 'main sky', function () { AUDIO.unlock(); applySave(sv); HUD.show(); go(battleInProgress() ? 'battle' : 'town'); })); } // 大決戦の途中で閉じていたら、その続きから
     var tools = el('div', 'tools');
-    var mute = btn(AUDIO.isMuted() ? '🔇' : '🔊', '', function () { AUDIO.unlock(); AUDIO.setMute(!AUDIO.isMuted()); mute.textContent = AUDIO.isMuted() ? '🔇' : '🔊'; });
-    var font = btn('Aあ', '', function () { SETTINGS.font = SETTINGS.font === 'big' ? 'normal' : 'big'; saveSettings(); toast('字の大きさ: ' + (SETTINGS.font === 'big' ? '大きい' : 'ふつう')); });
+    var mute = btn(AUDIO.isMuted() ? '🔇' : '🔊', 'lav', function () { AUDIO.unlock(); AUDIO.setMute(!AUDIO.isMuted()); mute.textContent = AUDIO.isMuted() ? '🔇' : '🔊'; });
+    var font = btn('Aあ', 'lav', function () { SETTINGS.font = SETTINGS.font === 'big' ? 'normal' : 'big'; saveSettings(); toast('字の大きさ: ' + (SETTINGS.font === 'big' ? '大きい' : 'ふつう')); });
     tools.appendChild(mute); tools.appendChild(font); t.appendChild(tools);
     t.appendChild(el('div', 'copy', '©2026 ROGUE PINK'));
-    ui.appendChild(t); this.stars = []; for (var i = 0; i < 14; i++) this.stars.push({ x: rnd(10, 380), y: rnd(20, 760), p: rnd(0, 6) });
+    ui.appendChild(t);
     function startNew() { clearSave(); dropBattleSave(); P = newPlayer(); go('opening'); } // 古いセーブは消す(「つづきから」に前のデータが残らないように)
   },
   leave: function () { if (this.node) this.node.remove(); },
   draw: function () {
-    var g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#140c2a'); g.addColorStop(1, '#2a1a4a'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    var self = this; this.stars.forEach(function (s) { var a = 0.3 + 0.7 * Math.abs(Math.sin(G.t * 1.3 + s.p)); ATL.draw('✨', s.x, s.y, 14, a * 0.8); });
+    drawWarmBg(150);
+    /* へっぽこ人形が 札束を持って ゆれる */
+    var k = easeBack((G.t - (this.t0 || 0)) / 0.6), sw = Math.sin(G.t * 2.2) * 0.07;
+    ctx.save(); ctx.translate(195, 240); ctx.rotate(sw); ctx.scale(k, k); ctx.translate(-195, -240);
+    ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.beginPath(); ctx.arc(195, 152, 96, 0, Math.PI * 2); ctx.fill();
+    DOLL.draw(195, 150, 0.45, { pose: 'money', noEmpty: true, equip: {} });
+    ATL.draw('💴', 140, 128 + Math.sin(G.t * 4) * 3, 34); ATL.draw('💴', 250, 128 + Math.cos(G.t * 4) * 3, 34);
+    ctx.restore();
   }
 };
-/* ---------- オープニング ---------- */
+/* ---------- オープニング(絵本) ---------- */
+/* 行の中の ことばから 絵を決める(台本が変わっても 合うように)。doll = へっぽこ人形を canvas に描く */
+function openingPic(s) {
+  if (/はじまった|はじまる/.test(s)) return { doll: 'jump', side: ['🌈', '⭐'] };
+  if (/ぼくも|なれるかも/.test(s)) return { doll: 'hero', side: ['✨', '✨'] };
+  if (/レシート/.test(s)) return { doll: 'smug', side: ['🧾', '🧾'] };
+  if (/買えば|ぜんぶ 買/.test(s)) return { doll: 'money', side: ['🛒', '💎'] };
+  if (/ママ/.test(s)) return { em: ['👩', '💴', '💴'] };
+  if (/お金持ち/.test(s)) return { em: ['🏰', '💰', '💎'] };
+  if (/王さま/.test(s)) return { em: ['😰', '👑', '💤'] };
+  if (/大魔王/.test(s)) return { em: ['😈', '⚡', '🏚️'] };
+  if (/へっぽこ/.test(s) && /お金/.test(s)) return { doll: 'smug', side: ['💰', '🛡️'] };
+  if (/へっぽこ/.test(s)) return { doll: 'normal', side: ['💭', '⚔️'] };
+  if (/お金/.test(s)) return { em: ['💰', '💴'] };
+  return { em: ['✨', '📖', '✨'] };
+}
 SCENES.opening = {
   enter: function () {
-    var self = this, node = el('div', ''); node.id = 'opening'; this.node = node;
-    var line = el('div', 'line'); node.appendChild(line); var tapn = el('div', 'tapnext', 'タップで ▼'); node.appendChild(tapn);
-    var skip = btn('とばす', 'skip', function () { finish(); }); node.appendChild(skip); ui.appendChild(node);
+    var self = this, node = el('div', ''); node.id = 'opening'; this.node = node; this.doll = null; this.t0 = G.t;
+    var pic = el('div', 'pic'), line = el('div', 'line'), dots = el('div', 'dots'); node.appendChild(pic); node.appendChild(line); node.appendChild(dots);
+    var tapn = el('div', 'tapnext', 'タップで つぎへ ▼'); node.appendChild(tapn);
+    var skip = btn('とばす ⏩', 'lav skip', function () { finish(); }); node.appendChild(skip); ui.appendChild(node);
     var lines = DATA.TEXTS.opening, i = 0, done = false;
-    var bgs = ['#0b0816', '#1a0f33', '#2a1a4a', '#8fd3ff'];
-    function showLine() { line.classList.remove('on'); setTimeout(function () { line.textContent = lines[i]; line.classList.add('on'); }, 60); node.style.background = bgs[Math.min(3, Math.floor(i / 3))]; node.style.color = i >= 9 ? PAL.ink : '#fff'; }
+    function showLine() {
+      var s = lines[i], pc = openingPic(s), h = '';
+      line.classList.remove('on'); setTimeout(function () { line.textContent = s; line.classList.add('on'); }, 60);
+      if (pc.doll) { h = '<span>' + pc.side[0] + '</span><span style="width:170px"></span><span>' + pc.side[1] + '</span>'; pic.style.fontSize = '64px'; }
+      else { pc.em.forEach(function (e) { h += '<span>' + e + '</span>'; }); pic.style.fontSize = pc.em.length > 2 ? '86px' : '100px'; }
+      pic.classList.remove('pop'); pic.innerHTML = h; void pic.offsetWidth; pic.classList.add('pop');
+      self.doll = pc.doll || null; self.t0 = G.t;
+      var dd = ''; for (var k = 0; k < lines.length; k++) dd += k === i ? '●' : '○'; dots.textContent = dd;
+    }
     showLine();
     node.addEventListener('click', function () { if (done) return; i++; if (i < lines.length) showLine(); else finish(); });
     function finish() { if (done) return; done = true; HUD.show(); go('town', { fresh: true }); }
   },
   leave: function () { if (this.node) this.node.remove(); },
-  draw: function () { ctx.fillStyle = '#0b0816'; ctx.fillRect(0, 0, W, H); }
+  draw: function () {
+    ctx.fillStyle = '#f3e3c8'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; for (var i = 0; i < 16; i++) { ctx.beginPath(); ctx.arc((i * 71) % W, (i * 113) % H, 6 + (i % 3) * 4, 0, Math.PI * 2); ctx.fill(); }
+    /* 絵本のページ */
+    ctx.save(); ctx.shadowColor = 'rgba(90,61,43,.25)'; ctx.shadowOffsetY = 6; rrect(14, 76, 362, 640, 30, '#fffaf0', PAL.ink, 4); ctx.restore();
+    ctx.save(); ctx.setLineDash([8, 7]); rrect(26, 88, 338, 616, 22, null, '#ecd6b8', 3); ctx.restore();
+    ctx.fillStyle = '#fff1c9'; ctx.beginPath(); ctx.ellipse(195, 268, 150, 112, 0, 0, Math.PI * 2); ctx.fill();   // 絵の下の まるい日だまり
+    if (this.doll) {
+      var k = easeBack((G.t - this.t0) / 0.5), bob = Math.sin(G.t * 3) * 4;
+      ctx.save(); ctx.translate(195, 360); ctx.scale(k, k); ctx.translate(-195, -360);
+      DOLL.draw(195, 262 + bob, 0.5, { pose: this.doll, noEmpty: true, equip: {} });
+      ctx.restore();
+    }
+  }
 };
 /* ---------- 出発の確認 ---------- */
 SCENES.confirmBoss = {
@@ -196,13 +267,15 @@ SCENES.lose = {
     P.losses++; var st = heroStats();
     var okane = P.losses <= 3 ? 50000 : 0;
     AUDIO.bgm('sad'); HUD.show();
-    var lines = DATA.TEXTS.defeat.slice();
-    if (okane) lines.push('王さまから おみまい金 ' + fmtG(okane) + ' が とどいた。「がんばれ。わしは 行かんが」');
-    var hint = untoldHint(); if (hint) lines.push('隣の おばさんが 教えてくれた。「' + hint + '」');
+    var lines = DATA.TEXTS.defeat.slice(0, 3);   // タップは 4回まで(負けの文 3行 + お見舞い金とヒントを 1行に)
+    var hint = untoldHint(), extra = [];
+    if (okane) extra.push('王さまから おみまい金 ' + fmtG(okane) + '。「がんばれ。わしは 行かんが」');
+    if (hint) extra.push('隣の おばさん:「' + hint + '」');
+    if (extra.length) lines.push(extra.join('\n'));
     say(null, lines, function () { if (okane) gain(okane); P.x = START.x; P.y = START.y; autosave(); go('town', { from: 'lose' }); });
   },
   tap: function () { DIALOG.tap(); },
-  draw: function () { ctx.fillStyle = '#0b0816'; ctx.fillRect(0, 0, W, H); ATL.draw('😵', 195, 300, 96); txt('…', 195, 380, 28, '#fff'); }
+  draw: function () { ctx.fillStyle = '#e9dcc6'; ctx.fillRect(0, 0, W, H); ATL.draw('😵', 195, 300, 96); txt('…', 195, 380, 28, PAL.ink, 'center', 900, null); }
 };
 function untoldHint() {
   var pairs = []; for (var m in BATTLE.BEST) if (!P.discovered[m + ':' + BATTLE.BEST[m]]) pairs.push(m);
@@ -213,6 +286,19 @@ function untoldHint() {
 SCENES.ending = {
   enter: function () {
     P.wins++; autosave(); AUDIO.bgm('town'); HUD.hide();
+    var self = this; this.node = null;
+    /* 写真のあとの ひとこと(DATA.TEXTS.ending。「ママ:「…」」の形なら 名前と顔を出す) */
+    var FACES = { 'ママ': '👩', 'へっぽこ': '🤴', 'パパ': '👨', '王さま': '🤴', '大魔王': '😈' };
+    var ends = (DATA.TEXTS && DATA.TEXTS.ending) || [], k = 0;
+    function nextEnd() {
+      if (k >= ends.length) { self.buildEnd(); return; }
+      var s = String(ends[k++]), m = s.match(/^([^:：「]{1,8})[:：]\s*(.*)$/);
+      if (m) say({ name: m[1], emoji: FACES[m[1]] || '💬' }, [m[2]], nextEnd); else say(null, [s], nextEnd);
+    }
+    nextEnd();
+  },
+  tap: function () { DIALOG.tap(); },
+  buildEnd: function () {
     var node = el('div', ''); node.id = 'title'; this.node = node;
     node.appendChild(el('div', 'emo', '🏆'));
     node.appendChild(el('h1', '', 'おしまい<small>勇者へっぽこの小さな冒険</small>'));
@@ -224,8 +310,8 @@ SCENES.ending = {
     node.appendChild(el('div', 'copy', 'ありがとう! ©2026 ROGUE PINK'));
     ui.appendChild(node);
   },
-  leave: function () { if (this.node) this.node.remove(); },
-  draw: function () { SCENES.title.draw.call({ stars: SCENES.title.stars || [] }); }
+  leave: function () { DIALOG.close(); if (this.node) this.node.remove(); },
+  draw: function () { drawWarmBg(200); if (!this.node) DOLL.draw(195, 250, 0.55, { pose: 'peace', noEmpty: true }); }
 };
 
 /* 起動 */
