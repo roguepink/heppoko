@@ -6,7 +6,13 @@ var BATTLE = (function () {
     DMG_SCALE_HERO: 20, DMG_SCALE_COMP: 70, HERO_BASE: { hp: 100, atk: 3, def: 2, spd: 5, luck: 5 },
     BOSS_ATK: { single: 1000, all: 450, big: 2700 }, BOSS_HEAL_RATE: 0.08, BOSS_HEAL_TIMES: 2,
     GUARD_MUL: 0.3, GUARD_STANCE: [0.35, 0.2, 0.1, 0.07, 0.05], HERO_TARGET_P: 0.5, REPEAT_COMBO_MUL: 0.25,
-    ROLE_MUL: { attack: 1.0, guard: 0.6, heal: 0.4, support: 0.6, weird: 1.0 }, ALL_COMP_MUL: 1.0, COMP_DEF_BONUS: 0
+    ROLE_MUL: { attack: 1.0, guard: 0.6, heal: 0.4, support: 0.6, weird: 1.0 }, ALL_COMP_MUL: 1.0, COMP_DEF_BONUS: 0,
+    COMP_HP_MUL: 1.1, // 仲間の体力を 一律に 何倍にするか(data.js の hp × これ)。2026-11-15「仲間が すぐ たおれる」で 1.0 → 1.1
+    /* へっぽこが お金で 買う「物」(仲間は 買えない)。price=1回の値段(G)、max=1戦に 使える回数(ママとの やくそく) */
+    SHOP: {
+      drink: { price: 100000, max: 2, compPct: 30, heroPct: 20 },   // 🧃 高級ドリンク: 生きている仲間 全員 最大HPの30%・へっぽこ20%
+      bandage: { price: 300000, max: 2, revivePct: 40 }              // 🩹 高級ばんそうこう: 倒れた仲間 1組を 最大HPの40%で 起こす
+    }
   };
   var PHASES = [
     { until: 0.70, name: 'よゆう', atk: 1.0, w: { normal: 45, all: 20, charge: 0, heal: 0, mood: 35 }, chargeGap: 99, moodP: 0.6, moods: ['boast', 'taunt', 'laugh', 'sleepy'] },
@@ -96,8 +102,8 @@ var BATTLE = (function () {
   function newState(heroStats, itemIds, comps, bossData) {
     return {
       turn: 1,
-      hero: { hp: heroStats.hp, maxHp: heroStats.hp, atk: heroStats.atk, def: heroStats.def, spd: heroStats.spd, luck: heroStats.luck, items: itemIds.slice(), guarding: false, vuln: 1, hguard: false, mamaUsed: false, noAct: false },
-      comps: comps.map(function (c) { return { id: c.id, name: c.name, emoji: c.emoji, role: c.battle.role, power: c.battle.power, hp: c.battle.hp, maxHp: c.battle.hp, def: c.battle.def || 20, count: c.count || 1, alive: true, lines: c.battle.lines || [], special: c.battle.special || null, reviveLeft: c.battle.role === 'heal' ? 1 : 0, stance: false }; }),
+      hero: { hp: heroStats.hp, maxHp: heroStats.hp, atk: heroStats.atk, def: heroStats.def, spd: heroStats.spd, luck: heroStats.luck, items: itemIds.slice(), guarding: false, vuln: 1, hguard: false, mamaUsed: false, noAct: false, shopUsed: { drink: 0, bandage: 0 } },
+      comps: comps.map(function (c) { return { id: c.id, name: c.name, emoji: c.emoji, role: c.battle.role, power: c.battle.power, hp: Math.round(c.battle.hp * CONST.COMP_HP_MUL), maxHp: Math.round(c.battle.hp * CONST.COMP_HP_MUL), def: c.battle.def || 20, count: c.count || 1, alive: true, lines: c.battle.lines || [], special: c.battle.special || null, reviveLeft: c.battle.role === 'heal' ? 1 : 0, stance: false }; }),
       boss: { name: bossData.name, hp: bossData.hp, maxHp: bossData.hp, mood: 'normal', moodLeft: 0, lastChargeTurn: -99, healsLeft: CONST.BOSS_HEAL_TIMES, atkMulTemp: 1, atkMulTempLeft: 0, defBreakLeft: 0, phase: 0, skipNext: 0 },
       buffs: { partyAtk: 1, partyDef: 1 }, heroBuff: 1, heroBuffNext: 1, mamaGuard: false,
       comboUsed: {}, discovered: {}, combos: 0, photos: 0, lastHitBy: null, log: []
@@ -145,10 +151,42 @@ var BATTLE = (function () {
   function setMood(s, m, events) { if (!MOODS[m]) return; s.boss.mood = m; s.boss.moodLeft = MOODS[m].len; if (m === 'charge') s.boss.chargeTurn = s.turn; s.moodSeen = s.moodSeen || {}; s.moodSeen[m] = (s.moodSeen[m] || 0) + 1; ev(events, 'mood', { mood: m, text: MOODS[m].line }); }
   function healHero(s, events, a) { var before = s.hero.hp; s.hero.hp = Math.min(s.hero.maxHp, s.hero.hp + a); ev(events, 'heal', { target: 'hero', amount: s.hero.hp - before }); }
 
+  /* お金で買う物が いま 使えるか。money = いまの所持金。{ ok, reason, left, price } */
+  function shopCheck(s, id, money) {
+    var it = CONST.SHOP[id]; if (!it) return { ok: false, reason: 'そんな物は ない' };
+    var used = (s.hero.shopUsed && s.hero.shopUsed[id]) || 0, left = it.max - used, out = { ok: false, left: left, price: it.price, max: it.max };
+    if (left <= 0) { out.reason = id === 'drink' ? 'ママとの やくそく: ドリンクは 1日 ' + it.max + '本まで' : 'ばんそうこうは もう ない(ママが ' + it.max + 'まいしか 入れてくれなかった)'; return out; }
+    if (id === 'drink' && !s.comps.some(function (c) { return c.alive; }) && s.hero.hp >= s.hero.maxHp) { out.reason = 'のむ人が いない'; return out; }
+    if (id === 'bandage' && !s.comps.some(function (c) { return !c.alive; })) { out.reason = 'たおれた 仲間は いない'; return out; }
+    if ((money === undefined ? Infinity : money) < it.price) { out.reason = 'お金が たりない(あと ' + (it.price - money).toLocaleString('ja-JP') + 'G)'; return out; }
+    out.ok = true; return out;
+  }
+  function useShop(s, cmd, events) {
+    var it = CONST.SHOP[cmd.id]; if (!it) return;
+    s.hero.shopUsed = s.hero.shopUsed || { drink: 0, bandage: 0 };
+    if (s.hero.shopUsed[cmd.id] >= it.max) { ev(events, 'text', { text: 'もう 使えない…' }); return; }
+    if (cmd.id === 'drink') {
+      s.hero.shopUsed.drink++;
+      ev(events, 'text', { text: cmd.text || 'へっぽこは 1本 1万Gの 高級ドリンクを みんなに くばった!', who: 'hero', shop: 'drink', price: it.price });
+      healHero(s, events, Math.floor(s.hero.maxHp * it.heroPct / 100));
+      var n = 0; s.comps.forEach(function (c) { if (c.alive) { c.hp = Math.min(c.maxHp, c.hp + Math.floor(c.maxHp * it.compPct / 100)); n++; } });
+      if (n) ev(events, 'heal', { target: 'all', amount: it.compPct + '%', by: 'drink' });
+      return;
+    }
+    if (cmd.id === 'bandage') {
+      var d = null; s.comps.forEach(function (c) { if (!c.alive && (c.id === cmd.target || !d)) d = (c.id === cmd.target ? c : (d || c)); });
+      if (!d) { ev(events, 'text', { text: 'たおれた 仲間は いなかった' }); return; }
+      s.hero.shopUsed.bandage++;
+      ev(events, 'text', { text: cmd.text || 'へっぽこは 1まい 30万Gの 金の ばんそうこうを ' + d.name + 'に はった!', who: 'hero', shop: 'bandage', price: it.price });
+      d.alive = true; d.hp = Math.max(1, Math.floor(d.maxHp * it.revivePct / 100));
+      ev(events, 'revive', { who: 'hero', target: d.id, hp: d.hp, by: 'bandage', text: d.name + 'が 起きあがった!' });
+    }
+  }
   /* ① へっぽこのコマンド */
   function resolveCommand(s, cmd, ITEMS, events, rng) {
     s.hero.guarding = false; s.hero.hguard = false; s.hero.vuln = 1; s.hero.noAct = false;
     if (cmd.kind === 'guard') { s.hero.guarding = true; ev(events, 'text', { text: 'へっぽこは 身を まもっている!' }); return; }
+    if (cmd.kind === 'shop') { useShop(s, cmd, events); return; }
     if (cmd.kind === 'attack') {
       var it = ITEMS[cmd.itemId]; if (!it) return;
       var at = it.attack || { name: 'たたく', power: 0.5, type: 'phys', text: 'へっぽこは ' + it.name + 'で たたいた!' };
@@ -189,7 +227,7 @@ var BATTLE = (function () {
         case 'heal':
           if (s.hero.hp < s.hero.maxHp * 0.6) { var a = c.power * 12; healHero(s, events, a); ev(events, 'act', { who: c.id, kind: 'heal', target: 'hero', amount: a, text: c.name + 'は へっぽこを 回復した! 💚' }); return; }
           var down = s.comps.filter(function (x) { return !x.alive; });
-          if (down.length && c.reviveLeft > 0) { c.reviveLeft--; var d = down[0]; d.alive = true; d.hp = Math.floor(d.maxHp / 2); ev(events, 'revive', { who: c.id, target: d.id, text: c.name + 'は ' + d.name + 'を よびもどした!' }); return; }
+          if (down.length && c.reviveLeft > 0) { c.reviveLeft--; var d = down[0]; d.alive = true; d.hp = Math.floor(d.maxHp / 2); ev(events, 'revive', { who: c.id, target: d.id, hp: d.hp, text: c.name + 'は ' + d.name + 'を よびもどした!' }); return; }
           var low = alive.filter(function (x) { return x.alive && x.hp < x.maxHp * 0.5; }).sort(function (a, b) { return a.hp / a.maxHp - b.hp / b.maxHp; })[0];
           if (low) { var h = c.power * 12; low.hp = Math.min(low.maxHp, low.hp + h); ev(events, 'act', { who: c.id, kind: 'heal', target: low.id, amount: h, text: c.name + 'は ' + low.name + 'を 回復した! 💚' }); return; }
           break;
@@ -311,26 +349,40 @@ var BATTLE = (function () {
     if (hasSupport || (s.moodSeen && s.moodSeen[m] >= 2) || s.missedIn === m) out.tip = HINT2[m];
     return out;
   }
-  /* 自動対戦(調整用) policy: 'novice'|'normal'|'expert'(コンボに気づく確率 0.35/0.7/1.0) */
-  function simulate(itemIds, comps, ITEMS, bossData, skill, n, seed) {
+  /* 自動対戦(調整用) policy: 'novice'|'normal'|'expert'(コンボに気づく確率 0.35/0.7/1.0)
+     opts.money = 戦いの前の所持金(回復の物を買う分)。opts.noShop = true で 回復コマンドを使わない(直す前と くらべる用) */
+  function simulate(itemIds, comps, ITEMS, bossData, skill, n, seed, opts) {
+    opts = opts || {};
     var wins = 0, turns = 0, rng = makeRng(seed || 1), P = { novice: 0.35, normal: 0.7, expert: 1.0 }[skill] || 0.7;
+    var stat = { drink: 0, bandage: 0, downTurn: 0, downN: 0, alive: 0, games: 0 };
     var bestItem = itemIds.filter(function (id) { return ITEMS[id] && ITEMS[id].attack && ITEMS[id].attack.type !== 'heal'; }).sort(function (a, b) { return ITEMS[b].attack.power - ITEMS[a].attack.power; })[0];
     var healItem = itemIds.filter(function (id) { return ITEMS[id] && ITEMS[id].attack && ITEMS[id].attack.type === 'heal'; })[0];
     for (var i = 0; i < n; i++) {
-      var st = newState(calcHeroStats(itemIds, ITEMS), itemIds, comps, bossData), res = null, used = {};
+      var st = newState(calcHeroStats(itemIds, ITEMS), itemIds, comps, bossData), res = null, used = {}, money = opts.money === undefined ? 1e9 : opts.money;
+      var firstDown = 0;
       while (!res && st.turn < 60) {
-        var cmd, m = st.boss.mood;
+        var cmd = null, m = st.boss.mood;
+        var alive = st.comps.filter(function (c) { return c.alive; }), down = st.comps.filter(function (c) { return !c.alive; });
+        var lowSum = alive.reduce(function (a, c) { return a + (1 - c.hp / c.maxHp); }, 0); // 減っている体力の合計(1 = 1組ぶん まるごと)
+        var useP = 0.5 + 0.5 * P; // 回復に 気づく確率(初見 68% / ふつう 85% / 達人 100%)
         if (m === 'charge') cmd = { kind: 'guard' };
         else if (BEST[m] && !used[m] && rng() < P) { used[m] = 1; cmd = { kind: 'waste', id: BEST[m] }; }
-        else if (healItem && st.hero.hp < st.hero.maxHp * 0.3) cmd = { kind: 'attack', itemId: healItem };
-        else if (!st.hero.mamaUsed && st.hero.hp < st.hero.maxHp * 0.25 && P >= 0.7) cmd = { kind: 'waste', id: 'mama' };
-        else cmd = bestItem ? { kind: 'attack', itemId: bestItem } : { kind: 'guard' };
+        if (!cmd && !opts.noShop) {
+          if (down.length && shopCheck(st, 'bandage', money).ok && rng() < useP) { var dd = down.slice().sort(function (a, b) { return b.power * (b.count >= 2 ? 0.75 : 1) - a.power * (a.count >= 2 ? 0.75 : 1); })[0]; cmd = { kind: 'shop', id: 'bandage', target: dd.id }; money -= CONST.SHOP.bandage.price; stat.bandage++; }
+          else if ((lowSum >= 2.5 || (st.hero.hp < st.hero.maxHp * 0.35 && alive.length)) && shopCheck(st, 'drink', money).ok && rng() < useP) { cmd = { kind: 'shop', id: 'drink' }; money -= CONST.SHOP.drink.price; stat.drink++; }
+        }
+        if (!cmd) {
+          if (healItem && st.hero.hp < st.hero.maxHp * 0.3) cmd = { kind: 'attack', itemId: healItem };
+          else if (!st.hero.mamaUsed && st.hero.hp < st.hero.maxHp * 0.25 && P >= 0.7) cmd = { kind: 'waste', id: 'mama' };
+          else cmd = bestItem ? { kind: 'attack', itemId: bestItem } : { kind: 'guard' };
+        }
         var out = runTurn(st, cmd, ITEMS, bossData, rng);
-        out.events.forEach(function (e) { if (e.type === 'end') res = e.result; });
+        out.events.forEach(function (e) { if (e.type === 'end') res = e.result; if (e.type === 'down' && !firstDown) firstDown = st.turn; });
       }
+      stat.games++; if (firstDown) { stat.downTurn += firstDown; stat.downN++; } stat.alive += st.comps.filter(function (c) { return c.alive; }).length;
       if (res === 'win') { wins++; turns += st.turn; }
     }
-    return { winRate: wins / n, avgTurns: wins ? turns / wins : 0 };
+    return { winRate: wins / n, avgTurns: wins ? turns / wins : 0, extra: 'ドリンク' + (stat.drink / n).toFixed(1) + ' ばん' + (stat.bandage / n).toFixed(1) + ' 初ダウン' + (stat.downN ? (stat.downTurn / stat.downN).toFixed(1) : '-') + 'T 最後の生存' + (stat.alive / n).toFixed(1) };
   }
-  return { CONST: CONST, PHASES: PHASES, MOODS: MOODS, EFFECTS: EFFECTS, BEST: BEST, HINT2: HINT2, makeRng: makeRng, calcHeroStats: calcHeroStats, newState: newState, runTurn: runTurn, checkEnd: checkEnd, hintFor: hintFor, simulate: simulate, phaseIdx: phaseIdx };
+  return { CONST: CONST, PHASES: PHASES, MOODS: MOODS, EFFECTS: EFFECTS, BEST: BEST, HINT2: HINT2, makeRng: makeRng, calcHeroStats: calcHeroStats, newState: newState, runTurn: runTurn, checkEnd: checkEnd, hintFor: hintFor, simulate: simulate, phaseIdx: phaseIdx, shopCheck: shopCheck, SHOP: CONST.SHOP };
 })();
