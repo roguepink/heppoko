@@ -91,6 +91,9 @@ var BATTLEUI = (function () {
     drink: ['へっぽこは 1本 1万Gの 高級ドリンクを 人数分 くばった!「おつりは いらない!」', 'へっぽこは 金色の びんの 栄養ドリンクを くばった!「1本 1万G! えんりょ しないで!」', 'へっぽこは スマホで ドリンクを 10本 注文した! すぐ とどいた!「おつりは いらない!」'],
     drinkReact: ['…これ 高すぎて のみにくい', 'ふつうの 麦茶で よかったのに', '味は ふつうの オレンジジュースだ', 'もったいなくて 半分 のこした', 'びんが 重くて 手が つかれた', 'ラベルに 「高級」って 3回 書いてある'],
     bandage: ['へっぽこは 1まい 30万Gの 金の ばんそうこうを ', 'へっぽこは ママが 入れてくれた 金の ばんそうこう(30万G)を '],
+    // お金が たりない時は パパの カード(お金持ちの子は お金で こまらない)
+    cardDrink: ['お財布が からっぽ! へっぽこは パパの カードで ドリンクを 10本 買った!', 'へっぽこ「パパの カードで!」金色の ドリンクが とどいた!(あとで おこられる)'],
+    cardBandage: ['お財布が からっぽ! へっぽこは パパの カードで 金の ばんそうこうを 買って @に はった!', 'へっぽこ「パパの カードで!」金の ばんそうこうを @に はった!(あとで おこられる)'],
     bandageReact: ['…まぶしくて 目が さめた', 'はがすの もったいないな', 'いたいの とんでった。値段に びっくりして', 'これ 金で できてるの…?']
   };
   function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
@@ -99,10 +102,16 @@ var BATTLEUI = (function () {
     if (!S || S.mode !== 'wait') return;
     var chk = BATTLE.shopCheck(S.st, id, money());
     if (!chk.ok) { AUDIO.sfx('cancel'); showBubble('😣 ' + chk.reason); clearTimeout(S.bubbleT); S.bubbleT = setTimeout(hideBubble, 1800); return; }
-    if (window.P) { if (typeof pay === 'function') { if (!pay(chk.price)) return; } else P.money -= chk.price; if (typeof autosave === 'function') { try { autosave(); } catch (e) {} } }
-    var txt0 = id === 'drink' ? pick(SHOP_LINES.drink) : pick(SHOP_LINES.bandage) + ((compOf(target) || { name: 'なかま' }).name) + 'に はった!';
+    if (window.P) {
+      var paid = chk.card ? Math.max(0, P.money || 0) : chk.price; // 足りないときは 手持ちを ぜんぶ 出して、のこりは パパの カード
+      if (paid > 0) { if (typeof pay === 'function') { if (!pay(paid)) return; } else P.money -= paid; }
+      if (typeof autosave === 'function') { try { autosave(); } catch (e) {} }
+    }
+    var tn = (compOf(target) || { name: 'なかま' }).name;
+    var txt0 = chk.card ? (id === 'drink' ? pick(SHOP_LINES.cardDrink) : pick(SHOP_LINES.cardBandage).replace('@', tn))
+      : (id === 'drink' ? pick(SHOP_LINES.drink) : pick(SHOP_LINES.bandage) + tn + 'に はった!');
     AUDIO.sfx('coin');
-    choose({ kind: 'shop', id: id, target: target, text: txt0 });
+    choose({ kind: 'shop', id: id, target: target, text: txt0, paid: window.P ? paid : chk.price, card: !!chk.card });
   }
   function pop(id, icon) { S.pops[id] = { t: 0.6, icon: icon }; }
   // 生きている仲間を みんな 回復(割合 pct %)。それぞれの札に 緑の +数字 を ぽよん
@@ -220,7 +229,7 @@ var BATTLEUI = (function () {
         setMsg([e.text], true);
         if (e.shop) { // お金を はらった: 所持金の数字が へり、-10万G が ぽよん
           S.moneyView = Math.max(0, S.moneyView - (e.price || 0)); S.moneyPop = 0.6;
-          floater({ x: W - 72, y: 100, text: '-' + manG(e.price || 0), size: 26, grow: 30, color: '#ffe066', stroke: '#8a5a00', rise: 30, bounce: true, dur: 1.6 });
+          floater({ x: W - 72, y: 100, text: e.card ? '💳 カード' : '-' + manG(e.price || 0), size: 26, grow: 30, color: '#ffe066', stroke: '#8a5a00', rise: 30, bounce: true, dur: 1.6 });
           floater({ x: DOLL_X + 40, y: DOLL_Y - 92, text: e.shop === 'drink' ? '🧃' : '🩹', size: 34, grow: 40, color: '#fff', stroke: null, rise: 24, bounce: true, dur: 1.2 });
           AUDIO.sfx('coin');
         }
@@ -507,14 +516,14 @@ var BATTLEUI = (function () {
       }
     } else if (mode === 'shop') {
       var mny = money(), sh = BATTLE.SHOP, dk = BATTLE.shopCheck(S.st, 'drink', mny), bd = BATTLE.shopCheck(S.st, 'bandage', mny);
-      var bD = gridButton('🧃', '高級ドリンク', dk.ok ? manG(sh.drink.price) + '・あと' + Math.max(0, dk.left) + '本' : dk.reason, dk.ok ? '#c8f5c0' : '#e6dcc8', '生きている 仲間 みんなを 体力の ' + sh.drink.compPct + '% 回復(へっぽこも ' + sh.drink.heroPct + '%)。1本 1万G × 10本。ママとの やくそくで 1日 ' + sh.drink.max + '本まで。(お金で 買えるのは 物だけ。仲間は 買えない)', function () { buyShop('drink'); });
+      var bD = gridButton('🧃', '高級ドリンク', dk.ok ? (dk.card ? '💳カード' : manG(sh.drink.price)) + '・あと' + Math.max(0, dk.left) + '本' : (dk.left <= 0 ? 'きょうは もう おしまい' : dk.reason), dk.ok ? '#c8f5c0' : '#e6dcc8', '生きている 仲間 みんなを 体力の ' + sh.drink.compPct + '% 回復(へっぽこも ' + sh.drink.heroPct + '%)。1本 1万G × 10本。ママとの やくそくで 1日 ' + sh.drink.max + '本まで。(お金で 買えるのは 物だけ。仲間は 買えない)', function () { buyShop('drink'); });
       if (!dk.ok) bD.classList.add('off');
       g.appendChild(bD);
       var downs = S.st.comps.filter(function (c) { return !c.alive; });
       if (downs.length && bd.reason !== 'たおれた 仲間は いない') {
         downs.forEach(function (c) {
           var nm2 = c.name.length > 6 ? c.name.slice(0, 5) + '…' : c.name;
-          var b2 = gridButton('🩹', c.emoji + nm2, bd.ok ? 'おこす・' + manG(sh.bandage.price) : bd.reason, bd.ok ? '#ffe7a8' : '#e6dcc8', '金の ばんそうこうで ' + c.name + 'を 体力の ' + sh.bandage.revivePct + '% で 起こす。1戦に ' + sh.bandage.max + 'まいまで(あと ' + Math.max(0, bd.left) + 'まい)。', function () { buyShop('bandage', c.id); });
+          var b2 = gridButton('🩹', c.emoji + nm2, bd.ok ? 'おこす・' + (bd.card ? '💳カード' : manG(sh.bandage.price)) : (bd.left <= 0 ? 'もう ない' : bd.reason), bd.ok ? '#ffe7a8' : '#e6dcc8', '金の ばんそうこうで ' + c.name + 'を 体力の ' + sh.bandage.revivePct + '% で 起こす。1戦に ' + sh.bandage.max + 'まいまで(あと ' + Math.max(0, bd.left) + 'まい)。', function () { buyShop('bandage', c.id); });
           if (!bd.ok) b2.classList.add('off');
           g.appendChild(b2);
         });
@@ -537,9 +546,11 @@ var BATTLEUI = (function () {
       section('そのほか');
       all.forEach(function (c) { if (keyIds.indexOf(c.id) < 0) add(c); });
     }
-    var bot = el('button', 'small closer', '▲ とじる'); bot.type = 'button';
-    bot.addEventListener('click', function (ev) { ev.stopPropagation(); AUDIO.sfx('cancel'); hideGrid(); S.gridMode = null; });
-    g.appendChild(bot);
+    if (mode !== 'shop') { // 下の「とじる」は 長い一覧のときだけ(回復の一覧は 短いので 上の1つで十分)
+      var bot = el('button', 'small closer', '▲ とじる'); bot.type = 'button';
+      bot.addEventListener('click', function (ev) { ev.stopPropagation(); AUDIO.sfx('cancel'); hideGrid(); S.gridMode = null; });
+      g.appendChild(bot);
+    }
     S.dom.root.classList.add('gridopen'); show(g); g.scrollTop = 0;
   }
   var CMD_EMOJI = { talk: '💬', tsukkomi: '👉', soothe: '🫳', janken: '✊', ignore: '🙈', dajare: '🥶', tea: '🍵', glare: '👀', sorry: '🙇', flee: '🏃', fake: '🤺', cry: '😭', boast: '💰', money: '💴', praise: '👏', sleep: '😴', dance: '💃', sing: '🎤', hungry: '🍽️', pray: '🙏', photo: '🤳', pout: '😤', mama: '👩', play_dead: '🫠', tickle: '🫦', hug: '🤗', count: '🔢', space_out: '☁️', homework_cmd: '📓', onigiri: '🍙', greet: '👋', mimic: '🎭', riddle_cmd: '❓', lecture: '📢', toilet: '🚽', sneeze: '🤧' };
