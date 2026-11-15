@@ -157,7 +157,7 @@ var BATTLE = (function () {
     var used = (s.hero.shopUsed && s.hero.shopUsed[id]) || 0, left = it.max - used, out = { ok: false, left: left, price: it.price, max: it.max };
     if (left <= 0) { out.reason = 'もう ない'; return out; }
     if (id === 'drink' && !s.comps.some(function (c) { return c.alive; }) && s.hero.hp >= s.hero.maxHp) { out.reason = 'のむ人が いない'; return out; }
-    if (id === 'bandage' && !s.comps.some(function (c) { return !c.alive; })) { out.reason = 'たおれた 仲間は いない'; return out; }
+    if (id === 'bandage' && !s.comps.some(function (c) { return !c.alive; })) { out.reason = 'いま いらない'; return out; }
     // お金が たりなくても 止めない。へっぽこは お金持ちの子なので、足りない分は パパの カードで はらう(card: true)
     out.card = money !== undefined && money < it.price;
     out.ok = true; return out;

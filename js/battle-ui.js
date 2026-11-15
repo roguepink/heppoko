@@ -520,7 +520,7 @@ var BATTLEUI = (function () {
       if (!dk.ok) bD.classList.add('off');
       g.appendChild(bD);
       var downs = S.st.comps.filter(function (c) { return !c.alive; });
-      if (downs.length && bd.reason !== 'たおれた 仲間は いない') {
+      if (downs.length && bd.reason !== 'いま いらない') {
         downs.forEach(function (c) {
           var nm2 = c.name.length > 6 ? c.name.slice(0, 5) + '…' : c.name;
           var b2 = gridButton('🩹', c.emoji + nm2, bd.ok ? 'おこす・' + (bd.card ? '💳カード' : manG(sh.bandage.price)) : (bd.left <= 0 ? 'もう ない' : bd.reason), bd.ok ? '#ffe7a8' : '#e6dcc8', '金の ばんそうこうで ' + c.name + 'を 体力の ' + sh.bandage.revivePct + '% で 起こす。1戦に ' + sh.bandage.max + 'まいまで(あと ' + Math.max(0, bd.left) + 'まい)。', function () { buyShop('bandage', c.id); });
@@ -528,7 +528,7 @@ var BATTLEUI = (function () {
           g.appendChild(b2);
         });
       } else {
-        var b3 = gridButton('🩹', '高級ばんそうこう', 'たおれた 仲間は いない', '#e6dcc8', 'たおれた 仲間を 1組 起こす 金の ばんそうこう(' + manG(sh.bandage.price) + '・1戦に ' + sh.bandage.max + 'まいまで)。', function () { buyShop('bandage'); });
+        var b3 = gridButton('🩹', '高級ばんそうこう', 'いま いらない', '#e6dcc8', 'たおれた 仲間を 1組 起こす 金の ばんそうこう(' + manG(sh.bandage.price) + '・1戦に ' + sh.bandage.max + 'まいまで)。', function () { buyShop('bandage'); });
         b3.classList.add('off'); g.appendChild(b3);
       }
     } else {
