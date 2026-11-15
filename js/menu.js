@@ -55,7 +55,33 @@
     '.panel.mn .row-item .nm .l2 .pr{flex:none}',
     '.mn .up,.mn .dn{white-space:nowrap}',
     '.panel.mn .row-item .nm .n.wrap{white-space:normal;word-break:keep-all;overflow-wrap:anywhere}',
-    '.mn .roombtn{width:100%;min-height:62px;margin-bottom:12px;font-size:19px;border-radius:22px}'
+    '.mn .roombtn{width:100%;min-height:62px;margin-bottom:12px;font-size:19px;border-radius:22px}',
+    /* なかま紹介所: 絞りこみボタンと 仲間カード */
+    '.mn .flt{display:flex;gap:6px;padding:0 10px 8px}',
+    '.mn .flt button{min-width:56px;min-height:60px;padding:2px 0 0;font-size:17px;letter-spacing:-1px;border-radius:18px;background:#fff;box-shadow:0 4px 0 var(--ink,#5a3d2b);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1;white-space:nowrap}',
+    '.mn .flt button .fe{font-size:20px;letter-spacing:0}',
+    '.mn .flt button.on{background:var(--gold,#ffd84d);box-shadow:0 4px 0 var(--gold-d,#d9a400)}',
+    '.mn .ccard{display:flex;gap:10px;align-items:flex-start;background:#fff;border:3px solid var(--ink,#5a3d2b);border-radius:20px;box-shadow:0 4px 0 rgba(90,61,43,.28);padding:10px;margin-bottom:12px;cursor:pointer;min-height:56px;transition:transform .12s,box-shadow .12s;-webkit-tap-highlight-color:transparent}',
+    '.mn .ccard:active{transform:scale(.98)}',
+    '.mn .ccard.mem{background:#eefbe9}',
+    '.mn .ccard.sel{background:#fffbe3;border-color:var(--gold-d,#d9a400);box-shadow:0 8px 0 var(--gold-d,#d9a400);transform:translateY(-3px)}',
+    '.mn .ccard.swap{border-style:dashed;border-color:#e0609f}',
+    '.mn .ccard .e{flex:none;width:58px;height:58px;border-radius:50%;font-size:32px;display:flex;align-items:center;justify-content:center;background:#ffe3f1;border:2px solid rgba(90,61,43,.22)}',
+    '.mn .ccard .bd{flex:1;min-width:0}',
+    '.mn .ccard .n{font-size:20px;font-weight:900;line-height:1.25;word-break:keep-all;overflow-wrap:anywhere}',
+    '.mn .ccard .meta{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;margin:5px 0 3px;font-size:17px;font-weight:900}',
+    '.mn .ccard .rl{border:2px solid var(--ink,#5a3d2b);border-radius:12px;padding:0 8px;white-space:nowrap}',
+    '.mn .ccard .rl.attack{background:#ffe0d6}.mn .ccard .rl.guard{background:#dff0ff}.mn .ccard .rl.heal{background:#e2f7dc}.mn .ccard .rl.support{background:#fff2c4}.mn .ccard .rl.weird{background:#efe4ff}',
+    '.mn .ccard .st{color:#e09a00;letter-spacing:1px;white-space:nowrap}',
+    '.mn .ccard .ct{white-space:nowrap;opacity:.85}',
+    '.mn .ccard .d{font-size:17px;line-height:1.4;opacity:.92}',
+    '.mn .ccard .off{flex:none;align-self:center;width:80px;min-height:56px;font-size:17px;border-radius:18px;padding:0 4px}',
+    '.mn .warnline{cursor:pointer}',
+    '#dialog .choices button.nw{white-space:nowrap;font-size:18px;letter-spacing:-1px;padding:0 4px}',
+    '.panel.mn .foot button.bigjoin{flex:1;font-size:20px;min-height:64px}',
+    '.panel.mn .foot button.bigjoin:disabled{opacity:.6}',
+    '.mn .lady{text-align:center;padding:26px 10px 10px;font-size:84px;line-height:1.1}',
+    '.mn .lady small{display:block;font-size:20px;font-weight:900;margin-top:10px}'
   ].join('\n');
   document.head.appendChild(st);
 })();
@@ -86,6 +112,13 @@ function roleCounts() {
   var r = { attack: 0, guard: 0, heal: 0, support: 0, weird: 0 };
   P.party.forEach(function (id) { var c = COMPS[id]; if (c && c.battle && r[c.battle.role] !== undefined) r[c.battle.role]++; });
   return r;
+}
+function roleWarnHtml() { // 足りない役の 一言(なかま画面・紹介所)
+  if (!P.party.length) return '';
+  var rc = roleCounts(), h = '';
+  if (!rc.guard) h += '<div class="warnline" data-r="guard">🛡️ まもり役が いない!(大技で あぶない)</div>';
+  if (!rc.heal) h += '<div class="warnline" data-r="heal">💚 かいふく役が いない!(けがを なおせない)</div>';
+  return h;
 }
 function statDiff(item, slot) { // いまの装備との差
   var cur = P.equip[slot] ? ITEMS[P.equip[slot]] : null, da = (item ? item.atk : 0) - (cur ? cur.atk : 0), dd = (item ? item.def : 0) - (cur ? cur.def : 0), dh = (item ? item.extra.hp : 0) - (cur ? cur.extra.hp : 0);
@@ -243,7 +276,7 @@ SCENES.party = {
     }
     function build() {
       info.innerHTML = '<span>' + P.party.length + ' / 10 組</span><span>候補は 町に ' + DATA.COMPANIONS.filter(function (c) { return P.party.indexOf(c.id) < 0; }).length + ' 組</span>'; list.innerHTML = ''; buildRoles();
-      if (!P.party.length) list.appendChild(el('div', 'desc', 'まだ 仲間が いない。町の 人に 話しかけてみよう。💬 の ふきだしが 出ている人が 仲間に なってくれる人。'));
+      if (!P.party.length) list.appendChild(el('div', 'desc', 'まだ 仲間が いない。町の 人に 話しかけてみよう。💬 の ふきだしが 出ている人が 仲間に なってくれる人。<br>めんどうなら 🗺️いく →「🤝 なかま紹介所」で タップだけで えらべるよ。'));
       P.party.forEach(function (id, i) {
         var c = COMPS[id], r = el('div', 'row-item prow'); r.innerHTML = '<div class="e">' + c.emoji + '</div><div class="nm"><span class="n">' + esc(c.name) + (c.count > 1 && c.name.indexOf(String(c.count)) < 0 ? ' ×' + c.count : '') + '</span><small>' + ROLE[c.battle.role] + '<br>力 ' + c.battle.power + ' · HP ' + c.battle.hp + '</small></div>';
         var ctl = el('div', 'ctl'), ud = el('div', 'ud');
@@ -329,6 +362,7 @@ var RECRUIT = (function () {
   /* お願い(favor)の進み方。check(P) が true なら 仲間になる。hint は まだのときの一言 */
   function inm(id) { return ITEMS[id] ? ITEMS[id].name : id; } // 品物の名前は data.js から読む
   var FAVOR = {
+    retired_hero: { check: function () { return (P.talked.retired_hero || 0) >= 3; }, hint: function () { return 'こしを もんだのは ' + (P.talked.retired_hero || 0) + ' 回。あと ' + Math.max(0, 3 - (P.talked.retired_hero || 0)) + ' 回 たのむ。'; } },
     priest: { check: function () { return (P.talked.priest || 0) >= 3; }, hint: function () { return 'かねを ならしたのは ' + ((P.talked.priest || 0)) + ' 回。あと ' + Math.max(0, 3 - (P.talked.priest || 0)) + ' 回。'; } },
     pomeranians: { check: function () { return (P.talked.pomeranians || 0) >= 3; }, hint: function () { return 'ワン! (ボール ' + (P.talked.pomeranians || 0) + ' 回。あと ' + Math.max(0, 3 - (P.talked.pomeranians || 0)) + ' 回 なげて!)'; } },
     monsters: { item: 'mama_bento', hint: function () { return '雑貨屋で「' + inm('mama_bento') + '」を 買ってきて…'; } },
@@ -344,10 +378,13 @@ var RECRUIT = (function () {
      ことわりの セリフは c.talk.money(台本係)。なければ 共通の 一言。1組につき 最初の 1回だけ */
   var MONEY_OFFER = ['いくら? 💴💴💴(札束を どさっと 出す)', 'いくら はらえば いい? 💴💴(札束を 出す)', 'お金なら あるよ! いくら? 💴💴💴'];
   var MONEY_NO = ['お金は いらないよ。しまって しまって。', 'え… お金? いらない いらない。', 'そういうのじゃ ないんだよ。', 'お金で きめることじゃ ないよ。'];
+  function refuseLines(c) { // c.talk.money(台本係)。なければ 共通の 一言
+    var m = c.talk && c.talk.money, common = (DATA.TEXTS && DATA.TEXTS.moneyRefuse) || pick(MONEY_NO);
+    return m ? (typeof m === 'string' ? [m] : m.slice()) : (typeof common === 'string' ? [common] : common.slice());
+  }
   function moneyFirst(c, next) {
     var key = 'moneyAsk_' + c.id; if (P.flags[key]) { next(); return; } P.flags[key] = true;
-    var m = c.talk && c.talk.money, common = (DATA.TEXTS && DATA.TEXTS.moneyRefuse) || pick(MONEY_NO), no = m ? (typeof m === 'string' ? [m] : m.slice()) : (typeof common === 'string' ? [common] : common.slice());
-    say(HERO, [pick(MONEY_OFFER)], function () { say({ name: c.name, emoji: c.emoji }, no, next); });
+    say(HERO, [pick(MONEY_OFFER)], function () { say({ name: c.name, emoji: c.emoji }, refuseLines(c), next); });
   }
   function join(c, then) {
     if (P.party.length >= 10) { say({ name: c.name, emoji: c.emoji }, ['…でも もう 10組 いるね。「なかま」で だれかを はずしたら 来るよ。']); then && then(false); return; }
@@ -374,9 +411,9 @@ var RECRUIT = (function () {
   function route(c, then, who, h, before) {
     switch (h.type) {
       case 'free': say(who, before.slice(0, 1).concat([h.text]), function () { ask(who, '仲間に なってもらう?', [{ label: 'おねがい!', cls: 'leaf', fn: function () { join(c, then); } }, { label: 'やめておく', cls: 'gray', fn: function () { then && then(false); } }]); }); break;
-      case 'pay': if (P.party.length >= 10) { join(c, then); break; } // 10組いっぱいのときは お金を取らずに 案内だけ
+      case 'pay': // 仲間は お金では 来ない: はらおうとする → ことわられる → 仲間になる(所持金は へらない)
         say(who, before.slice(0, 1).concat([h.text]), function () {
-        ask(who, fmtG(h.price) + ' はらう?' + (P.money >= h.price ? '(のこり ' + fmtG(P.money - h.price) + ')' : '(いまの お金 ' + fmtG(P.money) + ')'), [{ label: '💰 まとめて はらう!', cls: 'orange', disabled: P.money < h.price, fn: function () { if (!pay(h.price)) return; AUDIO.sfx('coin'); say(HERO, ['まとめて はらう! 💴💴💴 おつりは いらない!'], function () { join(c, then); }); } }, { label: P.money < h.price ? 'お金が たりない…' : 'やめておく', cls: 'gray', fn: function () { if (P.money < h.price) say(who, [c.talk.no]); then && then(false); } }]); }); break;
+        ask(who, '仲間に なってもらう?', [{ label: '💰 まとめて はらう!', cls: 'orange', fn: function () { say(HERO, ['まとめて はらう! 💴💴💴 おつりは いらない!'], function () { say(who, refuseLines(c), function () { join(c, then); }); }); } }, { label: 'やめておく', cls: 'gray', fn: function () { then && then(false); } }]); }); break;
       case 'riddle': case 'quest': say(who, before.slice(0, 1).concat([h.text]), function () {
         var ch = (h.choices || []).map(function (op) { return { label: op, cls: 'lav', fn: function () { if (op === h.answer) { AUDIO.sfx('ok'); join(c, then); } else { AUDIO.sfx('cancel'); say(who, [c.talk.no], function () { then && then(false); }); } } }; });
         ch.push({ label: 'あとで', cls: 'gray', fn: function () { then && then(false); } });
@@ -389,5 +426,115 @@ var RECRUIT = (function () {
         break; }
     }
   }
-  return { start: start };
+  return { start: start, refuseLines: refuseLines };
+})();
+
+/* ---------- なかま紹介所(めんどうな人のための お店) ----------
+   入る → おねえさんの 助言と 2択(🔍 自分で さがす / 📋 紹介してもらう)
+   一覧: カードを タップ(1) →「🤝 なかまに する」(2) で 仲間に。お金は へらない(だれも 受けとらない)。お願い・なぞなぞは とばす。
+   10組いっぱいなら「🔄 だれかと 入れかえる」→ はずす人の カードを タップ → 確認 */
+var SHOUKAI = (function () {
+  var ROLE_NM = { attack: '⚔️ こうげき', guard: '🛡️ まもり', heal: '💚 かいふく', support: '🎵 おうえん', weird: '🎲 へんな' };
+  var FILTERS = [['all', '📋', 'ぜんぶ', 62], ['attack', '⚔️', 'こうげき', 83], ['guard', '🛡️', 'まもり', 62], ['heal', '💚', 'かいふく', 83], ['other', '🎲', 'ほか', 56]];
+  var STARS = null;
+  function stars(c) { // 強さの めやす(力と HP から。34組を 5段に わける)
+    if (!STARS) { STARS = {}; var a = DATA.COMPANIONS.slice().sort(function (x, y) { return (x.battle.power + x.battle.hp / 30) - (y.battle.power + y.battle.hp / 30); }); a.forEach(function (x, i) { STARS[x.id] = 1 + Math.floor(i * 5 / a.length); }); }
+    var n = STARS[c.id] || 1, s = ''; for (var i = 0; i < 5; i++) s += i < n ? '★' : '☆'; return s;
+  }
+  function offerG(c) { return Math.max(10000, Math.round(c.battle.power * c.battle.hp / 100) * 1000); } // へっぽこが 出す 札束の 額(だれも 受けとらない)
+  function lady() { var n = NPCS.shoukai || { name: '紹介所のおねえさん', emoji: '👩‍💼' }; return { name: n.name, emoji: n.emoji }; }
+  var AFTER = ['お代は 0G です。…はい、札束は しまって ください。', 'はい、紹介料 0G。おつりも 0G です。', 'みなさん タダで 来てくれますからね。…ふしぎでしょ?'];
+  var scene = {
+    enter: function () {
+      var self = this; HUD.show(); HUD.setPlace('なかま紹介所'); AUDIO.bgm('shop');
+      var L = lady(), lines = (NPCS.shoukai && NPCS.shoukai.lines) || ['当店は お金を いただきません。'];
+      P.talked.shoukai = (P.talked.shoukai || 0) + 1;
+      var pn = panel('🤝 なかま紹介所', L.emoji + '「' + lines[(P.talked.shoukai - 1) % lines.length] + '」'); this.pn = pn;
+      var info = el('div', 'info'), warn = el('div', 'roles'), flt = el('div', 'flt'), list = el('div', 'list'), foot = el('div', 'foot');
+      pn.appendChild(info); pn.appendChild(warn); pn.appendChild(flt); pn.appendChild(list); pn.appendChild(foot); this.list = list;
+      var filter = 'all', sel = null, swap = null, shown = false;
+      var big = btn('', 'bigjoin leaf', function () { onBig(); });
+      foot.appendChild(backBtn()); foot.appendChild(big);
+      FILTERS.forEach(function (f) {
+        var b = btn('<span class="fe">' + f[1] + '</span><span>' + f[2] + '</span>', f[0] === filter ? 'on' : '', function () { if (DIALOG.isActive()) return; filter = f[0]; sel = null; flt.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); }); b.classList.add('on'); list.scrollTop = 0; build(); });
+        b.style.flex = '1 1 ' + f[3] + 'px'; flt.appendChild(b);
+      });
+      warn.addEventListener('click', function (ev) { var w = ev.target.closest ? ev.target.closest('.warnline') : null; if (!w || swap || DIALOG.isActive()) return; var r = w.getAttribute('data-r'); var fb = flt.querySelectorAll('button')[r === 'guard' ? 2 : 3]; if (fb) fb.click(); });
+      function isMem(c) { return P.party.indexOf(c.id) >= 0; }
+      function match(c) { var r = c.battle.role; return filter === 'all' || r === filter || (filter === 'other' && (r === 'weird' || r === 'support')); }
+      function who(c) { return { name: c.name, emoji: c.emoji }; }
+      function cname(c) { return c.name + (c.count > 1 && c.name.indexOf(String(c.count)) < 0 ? ' ×' + c.count : ''); }
+      function card(c) {
+        var m = isMem(c), r = el('div', 'ccard' + (m ? ' mem' : '') + (sel === c.id ? ' sel' : '') + (swap ? ' swap' : ''));
+        r.innerHTML = '<div class="e">' + c.emoji + '</div><div class="bd"><div class="n">' + esc(cname(c)) + '</div><div class="meta"><span class="rl ' + c.battle.role + '">' + ROLE_NM[c.battle.role] + '</span><span class="st">' + stars(c) + '</span><span class="ct">👥' + c.count + '</span>' + (m && !swap ? '<span class="badge">🤝 なかま</span>' : '') + '</div><div class="d">' + esc(c.desc) + '</div></div>';
+        if (m && !swap) { var off = btn('はずす', 'off gray', function (ev) { ev.stopPropagation(); if (DIALOG.isActive()) return; removeAsk(c); }); r.appendChild(off); }
+        r.addEventListener('click', function () {
+          if (DIALOG.isActive()) { DIALOG.tap(); return; }
+          AUDIO.sfx('tap');
+          if (swap) { swapAsk(c); return; }
+          sel = sel === c.id ? null : c.id; list.querySelectorAll('.ccard').forEach(function (x) { x.classList.remove('sel'); }); if (sel) r.classList.add('sel'); updateBig();
+        });
+        return r;
+      }
+      function build() {
+        if (!shown) return;
+        var keep = list.scrollTop; list.innerHTML = '';
+        info.innerHTML = '<span>いま ' + P.party.length + ' / 10 組</span><span>' + (swap ? '🔄 はずす人を えらんでね' : 'タップして えらぶ') + '</span>';
+        warn.innerHTML = swap ? '<div class="warnline" style="background:#ffe3f1;border-color:#e0609f;color:#8a2a5a">' + esc(swap.emoji + ' ' + swap.name) + ' と 入れかえる人を タップ</div>' : roleWarnHtml();
+        warn.style.display = warn.innerHTML ? '' : 'none'; flt.style.display = swap ? 'none' : '';
+        var arr = swap ? partyComps() : DATA.COMPANIONS.filter(match);
+        arr.forEach(function (c) { list.appendChild(card(c)); });
+        if (!arr.length) list.appendChild(el('div', 'desc', 'この 役の 人は いないみたい。'));
+        list.scrollTop = keep; updateBig();
+      }
+      function updateBig() {
+        var c = sel ? COMPS[sel] : null; big.disabled = false; big.className = 'bigjoin';
+        if (!shown) { big.innerHTML = '📋 紹介してもらう'; big.classList.add('leaf'); return; }
+        if (swap) { big.innerHTML = 'やめる'; big.classList.add('gray'); return; }
+        if (!c) { big.innerHTML = '👆 カードを えらんでね'; big.classList.add('leaf'); big.disabled = true; return; }
+        if (isMem(c)) { big.innerHTML = '👋 はずす'; big.classList.add('gray'); return; }
+        if (P.party.length >= 10) { big.innerHTML = '🔄 だれかと 入れかえる'; big.classList.add('orange'); return; }
+        big.innerHTML = '🤝 なかまに する'; big.classList.add('leaf');
+      }
+      function onBig() {
+        if (DIALOG.isActive()) return;
+        if (!shown) { showList(); return; }
+        if (swap) { swap = null; build(); return; }
+        var c = sel ? COMPS[sel] : null; if (!c) return;
+        if (isMem(c)) { removeAsk(c); return; }
+        if (P.party.length >= 10) { swap = c; list.scrollTop = 0; build(); return; }
+        recruit(c, null);
+      }
+      function removeAsk(c) {
+        confirm(c.emoji + ' ' + c.name + ' を 仲間から はずす?\n(町に もどる。また さそえる)', 'はずす', 'やめる', function (ok) { if (!ok) return; P.party.splice(P.party.indexOf(c.id), 1); AUDIO.sfx('ok'); autosave(); TOWN.refresh(); if (sel === c.id) sel = null; build(); });
+      }
+      function swapAsk(out) {
+        var c = swap; if (!c) return;
+        confirm(out.emoji + ' ' + out.name + ' を はずして、\n' + c.emoji + ' ' + c.name + ' を 仲間に する?', '🔄 いれかえる', 'やめる', function (ok) { if (ok) recruit(c, out.id); });
+      }
+      function recruit(c, outId) { // 仲間に する(先に 仲間に 入れてから 会話。お金は へらない)
+        if (outId) P.party[P.party.indexOf(outId)] = c.id; else P.party.push(c.id);
+        AUDIO.sfx('join'); autosave(); TOWN.refresh(); sel = null; swap = null; build();
+        var first = !P.flags.shoukaiJoined; P.flags.shoukaiJoined = true;
+        say(HERO, [fmtG(offerG(c)) + ' で どう? 💴💴💴(札束を どさっと 出す)'], function () {
+          say(who(c), RECRUIT.refuseLines(c).concat(['✨ ' + c.name + (c.count > 1 ? '(' + c.count + ')' : '') + ' が なかまに なった!(' + P.party.length + '/10組)' + (outId ? '\n(' + COMPS[outId].name + ' は 町に もどった)' : '')]), function () {
+            if (first) say(L, [AFTER[0]]); else if (Math.random() < 0.35) say(L, [pick(AFTER)]);
+          });
+        });
+      }
+      function showList() { shown = true; list.innerHTML = ''; build(); }
+      /* はじめに おねえさんの 助言 → 2択 */
+      list.appendChild(el('div', 'lady', L.emoji + '<small>' + esc(L.name) + '</small>')); flt.style.display = 'none'; warn.style.display = 'none';
+      info.innerHTML = '<span>いま ' + P.party.length + ' / 10 組</span>'; updateBig();
+      var choices = [{ label: '🔍 自分で さがす', cls: 'sky nw', fn: function () { popScene(); setTimeout(function () { if (G.scene === 'town' && TOWN.openGo) TOWN.openGo(); }, 350); } }, { label: '📋 紹介してもらう', cls: 'leaf nw', fn: function () { showList(); } }];
+      function askNow() { ask(L, P.flags.shoukaiTalked ? '自分で さそうほうが 楽しいですよ。…どうします?' : '紹介料は 0G。どうします?', choices); }
+      if (!P.flags.shoukaiTalked) {
+        setTimeout(function () { if (G.scene !== 'shoukai') return; say(L, ['いらっしゃいませ。なかま紹介所です。…札束は しまって ください。', 'でも ここだけの 話、仲間は 自分で 町の人に 話しかけて さそったほうが 楽しいですよ。お願いごとも、おもしろいし。'], function () { P.flags.shoukaiTalked = true; askNow(); }); }, 200);
+      } else setTimeout(function () { if (G.scene === 'shoukai') askNow(); }, 200);
+    },
+    leave: function () { if (this.pn) this.pn.remove(); DIALOG.close(); AUDIO.bgm('town'); },
+    tap: function () { DIALOG.tap(); }, draw: drawDim
+  };
+  SCENES.shoukai = scene;
+  return { offerG: offerG, stars: stars };
 })();
