@@ -13,9 +13,9 @@ var BATTLEUI = (function () {
   var MID_Y = 382;                        // 「みんなに 合計」などの数字を出す場所(ヒントの吹き出しと同じ帯。演出中は吹き出しが出ない)
   var LAYERS = ['#8a2be2', '#4a148c', '#1565c0', '#2e7d32', '#f9a825', '#ef6c00', '#c62828']; // 7 層(外から)
   // 1 つの出来事を見せる時間(秒)。設計 8-3。速さ「はやい」では ×0.5。1 ターン 5〜7 秒くらいになるよう 短め
-  var DUR = { text: 0.7, say: 1.8, boss: 0.8, act: 0.7, damage: 0.4, group: 0.9, compgroup: 1.0, party: 1.3, combo: 1.4, bigattack: 2.4, bigdmg: 1.2, phase: 1.3, mood: 1.1, warn: 0.9, heal: 0.5, revive: 0.9, down: 0.9, finisher: 2.6, win: 2.2, lose: 1.8, bigtext: 1.5, pay: 1.8 };
+  var DUR = { text: 0.7, say: 1.8, boss: 0.8, act: 0.7, damage: 0.4, group: 0.9, compgroup: 1.0, party: 1.3, combo: 1.4, bigattack: 2.4, bigdmg: 1.2, phase: 1.0, morph: 2.0, mood: 1.1, warn: 0.9, heal: 0.5, revive: 0.9, down: 0.9, finisher: 2.6, win: 2.2, lose: 1.8, bigtext: 1.5, pay: 1.8 };
   // タップで飛ばせない出来事(見逃し防止)
-  var PROTECT = { bigattack: 1, combo: 1, down: 1, phase: 1, end: 1, finisher: 1, bigdmg: 1, win: 1, lose: 1 };
+  var PROTECT = { morph: 1, bigattack: 1, combo: 1, down: 1, phase: 1, end: 1, finisher: 1, bigdmg: 1, win: 1, lose: 1 };
   // 手動(速さ 1)のとき タップ待ちになる出来事
   var TAPWAIT = { text: 1, say: 1, boss: 1, act: 1, mood: 1, phase: 1, down: 1, revive: 1, bigtext: 1, party: 1, pay: 1 };
   var ICON = { guardStance: '🛡️', heal: '💚', buffAtk: '🎵', buffDef: '🚩', nothing: '💤', mood: '💬', self: '💫', bheal: '😅' };
@@ -66,16 +66,6 @@ var BATTLEUI = (function () {
   }
   function compX(i) { return cardOf(i).cx; }
   function compY(i) { return cardOf(i).ey; }
-  function hpFace() {
-    var p = S.view.bossMax ? S.shownBossHp / S.view.bossMax : 1;
-    return p > 0.6 ? '😈' : p > 0.3 ? '😡' : p > 0.1 ? '😰' : '😱';
-  }
-  function bossFace() {
-    if (S.peelT > 0 && Math.floor(S.peelT * 10) % 2 === 0) return '😡';
-    var m = S.view.mood;
-    if (m === 'normal' || m === 'charge' || !BATTLE.MOODS[m]) return hpFace();
-    return BATTLE.MOODS[m].emoji;
-  }
   function layersOf(hp) { var p = S.view.bossMax ? hp / S.view.bossMax : 0; return p <= 0 ? 0 : Math.ceil(p * 7 - 1e-9); }
 
   /* ---------- 演出の小道具 ---------- */
@@ -182,6 +172,7 @@ var BATTLEUI = (function () {
         var nAct = grp.filter(function (x) { return x.type !== 'heal'; }).length;
         if (nAct >= 2) { out.push({ type: 'party', items: grp }); i = k2; continue; }
       }
+      if (e.type === 'phase') out.push({ type: 'morph', to: e.phase }); // 段階が変わる前に 変身の演出(boss.js)
       out.push(e);
       if (e.type === 'phase') { (window.DATA.BOSS.lines['phase' + (e.phase + 1)] || []).forEach(function (t) { out.push({ type: 'say', text: t }); }); }
       i++;
@@ -315,6 +306,14 @@ var BATTLEUI = (function () {
         if (e.text) { var mtx = e.text, alt = { boast: 'brag', taunt: 'taunt', cry: 'cry', asleep: 'sleep' }[e.mood]; if (alt && Math.random() < 0.5) { var mvv = moveText(alt); if (mvv) mtx = mvv.text; } // 大魔王の ほかのセリフも ときどき
           setMsg([mtx], true); if (e.mood === 'laugh') AUDIO.sfx('laugh'); else if (e.mood === 'angry') AUDIO.sfx('hurt'); else if (e.mood === 'charge') AUDIO.sfx('warn'); else AUDIO.sfx('talk'); }
         else S.wait = 0.25 * speedMul();
+        break; }
+      case 'morph': { // 白く光る → 黒い影が ふくらみながら 形を変える → 新しい姿(2 秒。「はやい」では 1.6 秒)
+        var from = S.view.phase;
+        if (from === e.to || !window.BOSSART) { S.wait = 0; break; }
+        S.morph = { t: 0, from: from, to: e.to, dur: SETTINGS.speed === 3 ? 1.6 : DUR.morph, shook: false, rev: false };
+        S.wait = S.morph.dur; S.view.phase = e.to;
+        flash([255, 255, 255], 0.95, 0.4); AUDIO.sfx('warn');
+        setMsg(['大魔王の すがたが かわっていく…!'], true);
         break; }
       case 'phase': {
         S.view.phase = e.phase; S.phaseTint = { t: 1.5, i: e.phase }; shake(8, 0.4); AUDIO.sfx('bighit');
@@ -569,7 +568,7 @@ var BATTLEUI = (function () {
   function fresh() {
     return { st: null, rng: null, dom: null, view: null, shownBossHp: 0, shownHeroHp: 0, queue: [], cur: null, wait: 0, typing: null, msgLines: [], msgDirty: true,
       floaters: [], confetti: [], flash: null, shake: { amp: 0, t: 0, dur: 1 }, lunge: null, pops: {}, rowShake: null, peelT: 0, barFlash: 0, warnT: 0, yellow: 0, phaseTint: null, heroPop: 0, moodPop: 0,
-      combo: null, finisherT: -1, finisherAmt: 0, finisher: null, finisherLabel: '', spin: -1, dark: -1, heroFace: '🤴', bigText: null, bigT: -1, pendingGo: null,
+      combo: null, finisherT: -1, finisherAmt: 0, finisher: null, finisherLabel: '', spin: -1, dark: -1, heroFace: '🤴', bigText: null, bigT: -1, pendingGo: null, morph: null,
       shownC: {}, downT: {}, banner: null, mode: 'play', gridMode: null, pinch: false, bigMove: null, hint: null, lastHeroAtk: null, result: null, resumed: false };
   }
 
@@ -608,6 +607,12 @@ var BATTLEUI = (function () {
       if (S.shake.t > 0) S.shake.t -= dt;
       if (S.lunge) { S.lunge.t += dt; if (S.lunge.t > 0.3) S.lunge = null; }
       if (S.rowShake) { S.rowShake.t -= dt; if (S.rowShake.t <= 0) S.rowShake = null; }
+      if (S.morph) { // 変身の とちゅう: ふくらむ所で 地面が ゆれ、新しい姿が 出る所で もう一度 光る
+        var mo = S.morph; mo.t += dt; var mu = mo.t / mo.dur;
+        if (mu > 0.36 && !mo.shook) { mo.shook = true; shake(12, 0.9); AUDIO.sfx('bighit'); }
+        if (mu > 0.72 && !mo.rev) { mo.rev = true; flash([255, 255, 255], 0.55, 0.3); }
+        if (mu >= 1) S.morph = null;
+      }
       if (S.phaseTint) { S.phaseTint.t -= dt; if (S.phaseTint.t <= 0) S.phaseTint = null; }
       for (var k in S.pops) { S.pops[k].t -= dt; if (S.pops[k].t <= 0) delete S.pops[k]; }
       S.floaters = S.floaters.filter(function (f) { f.t += dt; return f.t < f.dur; });
@@ -678,30 +683,30 @@ var BATTLEUI = (function () {
   }
   function drawBoss() {
     if (S.spin >= 2.2) return; // 消えた
-    var dy = 0, sc = 1, rot = 0, alpha = 1;
-    if (S.lunge) { dy = Math.sin(Math.PI * S.lunge.t / 0.3) * S.lunge.amp; }
-    if (S.bigT >= 0 && S.bigT < 1.2) sc = 1 + 0.25 * Math.sin(Math.PI * S.bigT / 1.2); // 大技: ふくらむ
+    var dy = 0, sc = 1, rot = 0, alpha = 1, atk = 0, ph = S.view.phase || 0;
+    if (S.lunge) { var lw = Math.sin(Math.PI * S.lunge.t / 0.3); dy = lw * S.lunge.amp; if (S.lunge.amp > 0) atk = lw; }
+    if (S.bigT >= 0 && S.bigT < 1.2) { sc = 1 + 0.25 * Math.sin(Math.PI * S.bigT / 1.2); atk = Math.max(atk, Math.sin(Math.PI * S.bigT / 1.2)); } // 大技: ふくらむ
     if (S.spin >= 0) { rot = S.spin * 9; sc = Math.max(0.02, 1 - S.spin / 2.2); alpha = clamp(1 - S.spin / 2.2, 0, 1); }
-    if (S.view.phase >= 3) sc *= 1.08;
-    if (S.spin < 0 && !reduced) rot = Math.sin(G.t * Math.PI) * 3 * Math.PI / 180; // ±3° で 2 秒ゆらゆら
-    // 足元の炎
-    var fl = 1 + 0.12 * Math.sin(G.t * 9), fl2 = 1 + 0.12 * Math.cos(G.t * 7);
-    if (S.spin < 0) { ATL.draw('🔥', 150, 284, 56 * fl); ATL.draw('🔥', 240, 284, 56 * fl2); }
-    ctx.save(); ctx.translate(BOSS_CX, BOSS_CY + dy); ctx.rotate(rot); ctx.scale(sc, sc);
-    // 角(三角 2 つ)
-    ctx.fillStyle = '#c0392b'; ctx.beginPath(); ctx.moveTo(-60, -70); ctx.lineTo(-30, -78); ctx.lineTo(-45, -112); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(60, -70); ctx.lineTo(30, -78); ctx.lineTo(45, -112); ctx.closePath(); ctx.fill();
-    BIG.draw(bossFace(), 0, 0, BOSS_SIZE, alpha);
-    if (S.view.phase >= 3 && S.spin < 0) { ctx.fillStyle = 'rgba(255,40,40,.55)'; ctx.beginPath(); ctx.arc(-28, -20, 7, 0, Math.PI * 2); ctx.arc(28, -20, 7, 0, Math.PI * 2); ctx.fill(); }
-    if (S.spin < 0) { // 汗 💦(ずっと あせっている)。HP が へるほど 汗が ふえる
-      var sw = (G.t * 0.8) % 1, many = S.view.bossMax && S.shownBossHp / S.view.bossMax < 0.4;
-      ATL.draw('💦', 74, -64 + sw * 26, 40, 1 - sw * 0.6);
-      if (many) ATL.draw('💦', -78, -50 + ((sw + 0.5) % 1) * 26, 32, 1 - ((sw + 0.5) % 1) * 0.6);
+    if (S.spin < 0 && !reduced) rot = Math.sin(G.t * Math.PI) * (ph >= 3 ? 1.5 : 3) * Math.PI / 180; // ゆらゆら(大きい姿は 少しだけ)
+    var hp = S.view.bossMax ? S.shownBossHp / S.view.bossMax : 1;
+    // 足元の炎(段階が上がるほど 大きく 外へ。のんきな 最初の姿には 出さない)
+    if (S.spin < 0 && !S.morph && ph >= 1) {
+      var fl = 1 + 0.12 * Math.sin(G.t * 9), fl2 = 1 + 0.12 * Math.cos(G.t * 7), fx = [0, 84, 108, 150][ph], fsz = [0, 40, 50, 58][ph];
+      ATL.draw('🔥', BOSS_CX - fx, 284, fsz * fl); ATL.draw('🔥', BOSS_CX + fx, 284, fsz * fl2);
+    }
+    ctx.save(); ctx.translate(BOSS_CX, BOSS_CY + dy); ctx.rotate(rot); ctx.scale(sc, sc); ctx.globalAlpha = alpha;
+    if (window.BOSSART) BOSSART.draw(ctx, ph, { t: G.t, mood: S.view.mood, hp: hp, hurt: S.peelT > 0 ? clamp(S.peelT / 0.6, 0, 1) : 0, atk: atk, dead: S.spin >= 0, reduced: reduced,
+      morph: S.morph ? S.morph.t / S.morph.dur : null, from: S.morph ? S.morph.from : null });
+    else BIG.draw('😈', 0, 0, BOSS_SIZE, alpha);
+    if (S.spin < 0 && !S.morph && ph >= 1 && ph <= 2) { // 汗 💦(いらいら・あせり)。HP が へるほど 汗が ふえる
+      var hd = BOSSART.head(ph), sw = (G.t * 0.8) % 1;
+      ATL.draw('💦', hd.x + 12, hd.y + sw * 24, 36, 1 - sw * 0.6);
+      if (ph === 2) ATL.draw('💦', -hd.x - 14, hd.y + 14 + ((sw + 0.5) % 1) * 24, 30, 1 - ((sw + 0.5) % 1) * 0.6);
     }
     ctx.restore();
     // 気分の絵文字(頭の右上・大きく)
     var m = S.view.mood;
-    if (m && m !== 'normal' && BATTLE.MOODS[m] && S.spin < 0) {
+    if (m && m !== 'normal' && BATTLE.MOODS[m] && S.spin < 0 && !S.morph) {
       var ps = S.moodPop > 0 ? 1 + 0.6 * (S.moodPop / 0.5) : 1 + 0.05 * Math.sin(G.t * 4);
       ATL.draw(BATTLE.MOODS[m].emoji, 310, 118 + (m === 'charge' ? Math.sin(G.t * 20) * 3 : 0), 64 * ps);
     }
