@@ -519,7 +519,7 @@ var DOLL = (function () {
   }
 
   /* 袖(腕の変換の中。肩が原点、腕は +y へ) */
-  function drawSleeve(c, s) {
+  function drawSleeve(c, s, sd) {
     if (!s) { RR(c, -13, -12, 26, 30, 11, SHIRT, 'rgba(27,20,48,.3)', 2); if (!LO) { c.beginPath(); c.moveTo(-12, 13); c.lineTo(12, 13); stitch(c, SHIRT_EDGE, 1.2); } return; }
     var k = s.t, col = s.col, i;
     if (k === 'pajama' || k === 'robe') {
@@ -549,7 +549,7 @@ var DOLL = (function () {
       RR(c, -13, -12, 26, 30, 11, SHIRT, 'rgba(27,20,48,.3)', 2);
     } else if (k === 'shirt') {   // ブランドの ふく: そでに 値札が ついたまま
       RR(c, -13, -12, 26, 30, 11, col, INK, 2.5); RR(c, -13, 11, 26, 6, 3, '#fff', INK, 1.5);
-      tag(c, 0, 16, 0.15, (s.price || 0) + 'G', '#e63e3e', 34);
+      if (sd === 1) tag(c, 0, 16, 0.15, (s.price || 0) + 'G', '#e63e3e', 34);
     } else {
       RR(c, -13, -12, 26, 30, 11, col, INK, 2.5);
       if (!LO) { c.beginPath(); c.moveTo(-12, 13); c.lineTo(12, 13); stitch(c, lt(col, 0.6), 1.2); }
@@ -1109,7 +1109,7 @@ var DOLL = (function () {
   function drawWeapon(c, T, s, t) {
     var k = s.t, col = s.col, i, j, x, y;
     if (k === 'sword' || k === 'dagger') {   // 剣: 柄頭・革まきの柄・つば・しのぎ・刃の光
-      var lg = s.legend, dg = k === 'dagger', len = dg ? 62 : lg ? 136 : 116, bw = dg ? 10 : lg ? 11 : 9.5, gy = -17;
+      var lg = s.legend, dg = k === 'dagger', len = dg ? 74 : lg ? 136 : 116, bw = dg ? 10 : lg ? 11 : 9.5, gy = -25;
       circ(c, 0, 20, 6.5); fillInk(c, lg ? '#ffd84d' : '#c9a227', 2.2); hiDot(c, -2, 18, 1.8);
       wrapGrip(c, gy, 16, 5, lg ? '#4a2a8a' : '#6b4226');
       var blade = function () { c.beginPath(); c.moveTo(-bw, gy - 6); c.lineTo(-bw, -len); c.lineTo(0, -len - 20); c.lineTo(bw, -len); c.lineTo(bw, gy - 6); c.closePath(); };
@@ -1124,7 +1124,7 @@ var DOLL = (function () {
           if (!LO) { c.beginPath(); c.moveTo(j * 8, gy - 3); c.quadraticCurveTo(j * 18, gy - 10, j * 27, gy - 10); c.lineWidth = 1.3; c.strokeStyle = '#d9a400'; c.stroke(); }
         }
         circ(c, 0, gy, 6.5); fillInk(c, '#e63e3e', 2); hiDot(c, -2, gy - 2, 2);
-        tag(c, -28, gy - 6, 0.3, (s.price || 0) + 'G', '#e63e3e', 52);
+        tag(c, -28, gy - 6, 0.3, (s.price || 0) + 'G', '#e63e3e', 60);
       } else {
         RR(c, -27, gy - 5, 54, 10, 5, '#c9a227', INK, 2.5); circ(c, -27, gy, 5); fillInk(c, '#ffd84d', 2); circ(c, 27, gy, 5); fillInk(c, '#ffd84d', 2);
         rivet(c, 0, gy, 2.6); hiDot(c, -28.5, gy - 1.5, 1.4); hiDot(c, 25.5, gy - 1.5, 1.4);
@@ -1554,7 +1554,7 @@ var DOLL = (function () {
     function arm(sd, th, grip) {   // sd = -1 右腕(画面左) / +1 左腕(画面右)
       c.save(); c.translate(195 + sd * SHOULDER.dx, SHOULDER.y); c.rotate(-sd * th);
       RR(c, -11, -10, 22, ARM_LEN + 6, 11, SKIN);                            // 腕
-      popOn('body', 0, 10); drawSleeve(c, S.body); c.restore();
+      popOn('body', 0, 10); drawSleeve(c, S.body, sd); c.restore();
       if (!grip) {
         c.fillStyle = SKIN; c.beginPath(); c.arc(0, ARM_LEN, HAND_R, 0, TAU); c.fill();   // 丸い手
         if (!LO) { c.beginPath(); c.arc(sd * 3, ARM_LEN + 2, 8, Math.PI * 0.15, Math.PI * 0.6); c.lineWidth = 1.6; c.strokeStyle = SKIN_EDGE; c.stroke(); }

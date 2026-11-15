@@ -422,7 +422,7 @@ var BOSSART = (function () {
     face(0, -2, 33, f, 2, t);
     c.beginPath(); for (s = -1; s <= 1; s += 2) { c.moveTo(s * 1, 9); c.bezierCurveTo(s * 7, 6, s * 14, 8, s * 15, 12); } stroke('#2a1838', 2.2); // ひげは ちょっと こげた
     if (d > 0.8 && !sil) smoke(50, -60, t, 3, 0.8);
-    crown(6, -30, 0.82, 0.42, t, sil);
+    crown(-4, -31, 0.82, -0.35, t, sil);
     if (f.sparkle && !sil) sparkle(30, -40, t);
     c.restore();
   }
