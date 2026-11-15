@@ -516,7 +516,7 @@ var BATTLEUI = (function () {
       }
     } else if (mode === 'shop') {
       var mny = money(), sh = BATTLE.SHOP, dk = BATTLE.shopCheck(S.st, 'drink', mny), bd = BATTLE.shopCheck(S.st, 'bandage', mny);
-      var bD = gridButton('🧃', '高級ドリンク', dk.ok ? (dk.card ? '💳カード' : manG(sh.drink.price)) + '・あと' + Math.max(0, dk.left) + '本' : (dk.left <= 0 ? 'きょうは もう おしまい' : dk.reason), dk.ok ? '#c8f5c0' : '#e6dcc8', '生きている 仲間 みんなを 体力の ' + sh.drink.compPct + '% 回復(へっぽこも ' + sh.drink.heroPct + '%)。1本 1万G × 10本。ママとの やくそくで 1日 ' + sh.drink.max + '本まで。(お金で 買えるのは 物だけ。仲間は 買えない)', function () { buyShop('drink'); });
+      var bD = gridButton('🧃', '高級ドリンク', dk.ok ? (dk.card ? '💳カード' : manG(sh.drink.price)) + '・あと' + Math.max(0, dk.left) + '本' : (dk.left <= 0 ? 'もう ない' : dk.reason), dk.ok ? '#c8f5c0' : '#e6dcc8', '生きている 仲間 みんなを 体力の ' + sh.drink.compPct + '% 回復(へっぽこも ' + sh.drink.heroPct + '%)。1本 1万G × 10本。ママとの やくそくで 1日 ' + sh.drink.max + '本まで。(お金で 買えるのは 物だけ。仲間は 買えない)', function () { buyShop('drink'); });
       if (!dk.ok) bD.classList.add('off');
       g.appendChild(bD);
       var downs = S.st.comps.filter(function (c) { return !c.alive; });
