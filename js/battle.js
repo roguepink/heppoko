@@ -158,7 +158,8 @@ var BATTLE = (function () {
     if (left <= 0) { out.reason = id === 'drink' ? 'ママとの やくそく: ドリンクは 1日 ' + it.max + '本まで' : 'ばんそうこうは もう ない(ママが ' + it.max + 'まいしか 入れてくれなかった)'; return out; }
     if (id === 'drink' && !s.comps.some(function (c) { return c.alive; }) && s.hero.hp >= s.hero.maxHp) { out.reason = 'のむ人が いない'; return out; }
     if (id === 'bandage' && !s.comps.some(function (c) { return !c.alive; })) { out.reason = 'たおれた 仲間は いない'; return out; }
-    if ((money === undefined ? Infinity : money) < it.price) { out.reason = 'お金が たりない(あと ' + (it.price - money).toLocaleString('ja-JP') + 'G)'; return out; }
+    // お金が たりなくても 止めない。へっぽこは お金持ちの子なので、足りない分は パパの カードで はらう(card: true)
+    out.card = money !== undefined && money < it.price;
     out.ok = true; return out;
   }
   function useShop(s, cmd, events) {
@@ -167,7 +168,7 @@ var BATTLE = (function () {
     if (s.hero.shopUsed[cmd.id] >= it.max) { ev(events, 'text', { text: 'もう 使えない…' }); return; }
     if (cmd.id === 'drink') {
       s.hero.shopUsed.drink++;
-      ev(events, 'text', { text: cmd.text || 'へっぽこは 1本 1万Gの 高級ドリンクを みんなに くばった!', who: 'hero', shop: 'drink', price: it.price });
+      ev(events, 'text', { text: cmd.text || 'へっぽこは 1本 1万Gの 高級ドリンクを みんなに くばった!', who: 'hero', shop: 'drink', price: cmd.paid !== undefined ? cmd.paid : it.price, card: !!cmd.card });
       healHero(s, events, Math.floor(s.hero.maxHp * it.heroPct / 100));
       var n = 0; s.comps.forEach(function (c) { if (c.alive) { c.hp = Math.min(c.maxHp, c.hp + Math.floor(c.maxHp * it.compPct / 100)); n++; } });
       if (n) ev(events, 'heal', { target: 'all', amount: it.compPct + '%', by: 'drink' });
@@ -177,7 +178,7 @@ var BATTLE = (function () {
       var d = null; s.comps.forEach(function (c) { if (!c.alive && (c.id === cmd.target || !d)) d = (c.id === cmd.target ? c : (d || c)); });
       if (!d) { ev(events, 'text', { text: 'たおれた 仲間は いなかった' }); return; }
       s.hero.shopUsed.bandage++;
-      ev(events, 'text', { text: cmd.text || 'へっぽこは 1まい 30万Gの 金の ばんそうこうを ' + d.name + 'に はった!', who: 'hero', shop: 'bandage', price: it.price });
+      ev(events, 'text', { text: cmd.text || 'へっぽこは 1まい 30万Gの 金の ばんそうこうを ' + d.name + 'に はった!', who: 'hero', shop: 'bandage', price: cmd.paid !== undefined ? cmd.paid : it.price, card: !!cmd.card });
       d.alive = true; d.hp = Math.max(1, Math.floor(d.maxHp * it.revivePct / 100));
       ev(events, 'revive', { who: 'hero', target: d.id, hp: d.hp, by: 'bandage', text: d.name + 'が 起きあがった!' });
     }
