@@ -5,9 +5,9 @@ var TOWN = (function () {
   var trail = [], cam = { x: 0, y: 0 }, target = null, people = [], bottom = null, tipI = 0, tipKey = '', held = null, justIn = false, hintShown = false;
   var VIEW_Y = 52, VIEW_H = 576, SPEED = 0.18, AUTO_SPEED = 0.12, HALF = TILE / 2;
   var INK = '#5a3d2b';
-  var PLACE_NAME = { weapon: '⚔️ 武器屋', armor: '🛡️ 防具屋', accessory: '💍 アクセサリー屋', zakka: '🧺 雑貨屋', church: '⛪ 教会', inn: '🛏️ 宿', home: '🏠 へっぽこの家', aunt: '🏡 隣のおばさんの家', castle: '🏰 お城' };
+  var PLACE_NAME = { weapon: '⚔️ 武器屋', armor: '🛡️ 防具屋', accessory: '💍 アクセサリー屋', zakka: '🧺 雑貨屋', church: '⛪ 教会', inn: '🛏️ 宿', home: '🏠 へっぽこの家', aunt: '🏡 隣のおばさんの家', castle: '🏰 お城', shoukai: '🤝 なかま紹介所' };
   /* 「🗺️ いく」の行き先(扉の座標は map.js の DOORS から引く) */
-  var GO_PLACES = [['weapon', '⚔️', '武器屋'], ['armor', '🛡️', '防具屋'], ['accessory', '💍', 'アクセ屋'], ['zakka', '🧺', '雑貨屋'], ['castle', '🏰', 'お城'], ['church', '⛪', '教会'],
+  var GO_PLACES = [['shoukai', '🤝', 'なかま紹介所'], ['weapon', '⚔️', '武器屋'], ['armor', '🛡️', '防具屋'], ['accessory', '💍', 'アクセ屋'], ['zakka', '🧺', '雑貨屋'], ['castle', '🏰', 'お城'], ['church', '⛪', '教会'],
     ['inn', '🛏️', '宿'], ['home', '🏠', 'へっぽこの家'], ['aunt', '🏡', 'おばさんの家'], ['exit', '🚪', '南の出口']];
   var EXITS = [[11, 23], [12, 23]];
 
@@ -36,6 +36,7 @@ var TOWN = (function () {
       '#gobox .grid button.pl{background:#fff;}' +
       '#gobox .grid button.exit{background:var(--gold,#ffd84d);}' +
       '#gobox .grid button.cp{background:#ffe3f1;}' +
+      '#gobox .grid button.sk{background:var(--pink,#ff8fc8);}' +
       '#gobox .grid button small{display:block;font-size:15px;opacity:.75;font-weight:800;}' +
       '#gobox .close{margin-top:8px;min-height:58px;border-radius:22px;background:#fff;width:100%;}';
     document.head.appendChild(st);
@@ -74,6 +75,7 @@ var TOWN = (function () {
     if (notWorn) L.push('買った物は 🎽そうび で つけよう');
     if (!eq.rhand && !eq.lhand) L.push('次は ⚔️武器屋で 武器を 買おう');
     if (n < 3) L.push('次は 仲間を さがそう ' + n + '/10');
+    if (n < 3) L.push('めんどうなら 🗺️→🤝なかま紹介所 へ');
     if (!eq.body && !eq.head) L.push('次は 🛡️防具屋で 防具を 買おう');
     if (n > 0 && !rc.guard) L.push('🛡️まもり役の 仲間が いない!');
     if (n >= 3 && n < 10) L.push('仲間は ' + n + '/10。まだ さそえる');
@@ -106,13 +108,13 @@ var TOWN = (function () {
     scr.appendChild(el('div', 'sec', '🏘️ 行き先'));
     var g1 = el('div', 'grid');
     GO_PLACES.forEach(function (pl) {
-      g1.appendChild(btn('<span class="e">' + pl[1] + '</span><span>' + pl[2] + '</span>', pl[0] === 'exit' ? 'exit' : 'pl', function () { close(); goPlace(pl[0]); }));
+      g1.appendChild(btn('<span class="e">' + pl[1] + '</span><span>' + pl[2] + '</span>', pl[0] === 'exit' ? 'exit' : pl[0] === 'shoukai' ? 'sk' : 'pl', function () { close(); goPlace(pl[0]); }));
     });
     scr.appendChild(g1);
     var cands = people.filter(function (p) { return p.kind === 'comp'; });
     cands.sort(function (a, b) { return (Math.abs(a.x - hero.x) + Math.abs(a.y - hero.y)) - (Math.abs(b.x - hero.x) + Math.abs(b.y - hero.y)); });
     scr.appendChild(el('div', 'sec', '🤝 まだ さそっていない 仲間候補(' + cands.length + ')'));
-    if (P.party.length >= 10) scr.appendChild(el('div', 'note', '仲間は 10組 いっぱい。話すだけなら できるよ。'));
+    if (P.party.length >= 10) scr.appendChild(el('div', 'note', '仲間は 10組 いっぱい。話すだけなら できるよ。(入れかえは 🤝なかま紹介所 で)'));
     if (!cands.length) scr.appendChild(el('div', 'note', '町の 仲間候補は もう いない。'));
     var g2 = el('div', 'grid');
     cands.forEach(function (p) {

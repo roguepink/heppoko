@@ -9,7 +9,7 @@ var SLOTS = ['head', 'face', 'body', 'rhand', 'lhand', 'cape', 'waist', 'feet', 
 var SLOT_NAME = { head: 'あたま', face: 'かお', body: 'からだ', rhand: 'みぎて', lhand: 'ひだりて', cape: 'マント', waist: 'こし', feet: 'あし', ring: 'ゆびわ', charm: 'おまもり' };
 var SLOT_EMOJI = { head: '👒', face: '👓', body: '👕', rhand: '🫱', lhand: '🫲', cape: '🧣', waist: '👖', feet: '👟', ring: '💍', charm: '📿' };
 /* 家の中にいる人(町のマップには出さない) */
-var INTERIOR = { king: 'castle', princess: 'castle', mama: 'home', papa: 'home', shop_weapon: 'weapon', shop_armor: 'armor', shop_acc: 'accessory', shop_zakka: 'zakka' };
+var INTERIOR = { king: 'castle', princess: 'castle', mama: 'home', papa: 'home', shop_weapon: 'weapon', shop_armor: 'armor', shop_acc: 'accessory', shop_zakka: 'zakka', shoukai: 'shoukai' };
 COMPS.aunt.where = null; // おばさんは自分の家の中
 
 var P = null;

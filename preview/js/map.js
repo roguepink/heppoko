@@ -2,8 +2,8 @@
 /* 町のマップ(24×24)。記号の意味は docs/design-ui.md 2-2。裏 canvas に1回描いて、毎フレームは切り出すだけ。 */
 var TILE = 44, MAPW = 24, MAPH = 24; // 1マスの大きさ(画面の論理 px)。絵は 32 を基準に描いて、TILE に合わせて広げる
 var MAP = [
-  'TTTTTTTCCCCCCCCCCTTTTTTT',
-  'TT..TTTCccccccccCTTT..TT',
+  'TTTTnnnCCCCCCCCCCTTTTTTT',
+  'TT..SDWCccccccccCTTT..TT',
   'T......CccccccccC......T',
   'T.*..*.CWWWWWWWWC.*..*.T',
   'T.*..*.CWWWGGWWWC.*..*.T',
@@ -29,8 +29,8 @@ var MAP = [
 ];
 var PASS = { '.': 1, '*': 1, '=': 1, '#': 1, 's': 1, 'D': 2, 'G': 2, 'E': 3 };
 /* 扉 → 場所 */
-var DOORS = { '2,9': 'weapon', '7,9': 'armor', '15,9': 'church', '20,9': 'inn', '2,18': 'accessory', '7,18': 'zakka', '18,19': 'home', '21,21': 'aunt', '11,4': 'castle', '12,4': 'castle' };
-var SIGNS = { '2,8': '⚔️', '7,8': '🛡️', '20,8': '🛏️', '2,17': '💍', '7,17': '🧺', '22,21': '🏡' };
+var DOORS = { '2,9': 'weapon', '7,9': 'armor', '15,9': 'church', '20,9': 'inn', '2,18': 'accessory', '7,18': 'zakka', '18,19': 'home', '21,21': 'aunt', '11,4': 'castle', '12,4': 'castle', '5,1': 'shoukai' };
+var SIGNS = { '2,8': '⚔️', '7,8': '🛡️', '20,8': '🛏️', '2,17': '💍', '7,17': '🧺', '22,21': '🏡', '4,1': '🤝' };
 var START = { x: 18, y: 20 };
 function tileAt(x, y) { if (x < 0 || y < 0 || x >= MAPW || y >= MAPH) return 'T'; return MAP[y][x]; }
 function passable(x, y) { return (PASS[tileAt(x, y)] || 0) > 0; }
@@ -82,7 +82,7 @@ function findPath(sx, sy, tx, ty, blocked) {
 var mapCanvas = null, mapCanvasTop = null, MAP_INK = '#5a3d2b';
 var ROOF_LABEL = [ // 屋根に書く名前 [左のマス, 右のマス, 行, 字]
   [1, 4, 7, '⚔️ 武器屋'], [6, 9, 7, '🛡️ 防具屋'], [14, 17, 7, '⛪ 教会'], [19, 22, 7, '🛏️ 宿'],
-  [1, 4, 16, '💍 アクセ屋'], [6, 9, 16, '🧺 雑貨屋'], [14, 22, 16.5, '🏠 へっぽこの家'], [20, 22, 20, 'おばさんの家'], [8, 15, 2, '🏰 お城']
+  [1, 4, 16, '💍 アクセ屋'], [6, 9, 16, '🧺 雑貨屋'], [14, 22, 16.5, '🏠 へっぽこの家'], [20, 22, 20, 'おばさんの家'], [8, 15, 2, '🏰 お城'], [4, 6, 0, 'なかま紹介所']
 ];
 function buildMap() {
   var B = 32, dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -125,6 +125,7 @@ function buildMap() {
         break;
       case 'R': case 'r': c.fillStyle = ch === 'R' ? '#ffa595' : '#94cdf3'; c.fillRect(px, py, 32, 32); c.fillStyle = ch === 'R' ? '#f78f7f' : '#7dbbe6';
         for (var i = 7; i < 32; i += 9) c.fillRect(px, py + i, 32, 2); break;
+      case 'n': c.fillStyle = '#ffbfdf'; c.fillRect(px, py, 32, 32); c.fillStyle = '#ffa3cf'; for (i = 5; i < 32; i += 9) c.fillRect(px, py + i, 32, 2); break; // なかま紹介所の ピンクの屋根
       case 'C': c.fillStyle = '#ebe6f5'; c.fillRect(px, py, 32, 32); c.fillStyle = '#d8d0e8'; for (i = 0; i < 32; i += 10) c.fillRect(px, py + i + 8, 32, 2);
         if (tileAt(x, y - 1) === 'T' || y === 0) { c.fillStyle = '#d8d0e8'; for (i = 0; i < 32; i += 10) c.fillRect(px + i + 3, py, 5, 5); } break;
       case 'c': c.fillStyle = '#c9b6f2'; c.fillRect(px, py, 32, 32);
@@ -137,7 +138,7 @@ function buildMap() {
     }
   }
   // 屋根と壁(と お城)に こげ茶の縁
-  edgeGroup('R', MAP_INK, 2); edgeGroup('r', MAP_INK, 2); edgeGroup('WS+D', MAP_INK, 2); edgeGroup('Cc', MAP_INK, 2); edgeGroup('G', MAP_INK, 2);
+  edgeGroup('R', MAP_INK, 2); edgeGroup('r', MAP_INK, 2); edgeGroup('n', MAP_INK, 2); edgeGroup('WS+D', MAP_INK, 2); edgeGroup('Cc', MAP_INK, 2); edgeGroup('G', MAP_INK, 2);
   // 屋根の上に 場所の名前(看板)
   ROOF_LABEL.forEach(function (L) {
     var cx = (L[0] + L[1] + 1) / 2 * B, cy = (L[2] + 0.5) * B, size = 17 * B / TILE;
