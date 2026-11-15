@@ -11,13 +11,13 @@ var BOSSART = (function () {
   var c = null;                       // いま描いている ctx
   var INK = '#1b1430', PI = Math.PI, TAU = PI * 2, GROUND = 96;
   var F = '"Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic UI","Meiryo","Noto Sans JP",system-ui,sans-serif';
-  var SK = ['#b39ae6', '#a07ad8', '#7f55b8', '#2e1846'];   // はだ(段階ごと。だんだん 暗く)
-  var SKL = ['#d2c0f5', '#c3a6ee', '#9d76d4', '#4a2a6a'];  // はだの 明るいところ
-  var SKD = ['#8c6cc8', '#7a52b8', '#5a3590', '#170a26'];  // はだの かげ
+  var SK = ['#b39ae6', '#a07ad8', '#7f55b8', '#47286e'];   // はだ(段階ごと。だんだん 暗く)
+  var SKL = ['#d2c0f5', '#c3a6ee', '#9d76d4', '#6c42a2'];  // はだの 明るいところ
+  var SKD = ['#8c6cc8', '#7a52b8', '#5a3590', '#21103a'];  // はだの かげ
   var ROBE = ['#e0557a', '#c23a5e', '#8e1f3f'], ROBED = ['#9c2348', '#7d1838', '#3f0a1d'];
   var CREAM = '#fff1d8', CLAW = '#f4ead2', SILC = '#12061f';
   var HT = [178, 214, 240, 250];      // 段階ごとの だいたいの 高さ(変身で ふくらむ割合)
-  var off = null, oc = null, OFF_W = 420, OFF_H = 280, OFF_X = 210, OFF_Y = 158, OFF_S = 2;
+  var OFF = [], OFF_W = 420, OFF_H = 280, OFF_X = 210, OFF_Y = 158, OFF_S = 2;
 
   /* ---------- 小さな道具 ---------- */
   function cl01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
@@ -92,9 +92,11 @@ var BOSSART = (function () {
     circ(-16, -7, 2.3); fs('#ffd84d', 1.4); circ(0, -12, 2.5); fs('#ffd84d', 1.4); circ(16, -7, 2.3); fs('#ffd84d', 1.4);
     circ(0, 2, 2.6); fs('#e53950'); circ(-9, 3, 1.9); fs('#4fa8d8'); circ(9, 3, 1.9); fs('#5fb84e');
     // ねふだ(ひもで ぶらぶら)
-    c.save(); c.translate(15, 3); c.rotate(0.35 + Math.sin(t * 2.1) * 0.22);
-    c.beginPath(); c.moveTo(0, 0); c.lineTo(0, 9); stroke(INK, 1.2);
-    rr(-10, 9, 20, 12, 2); fs('#fff', 1.5); word('三世', 0, 15.5, 8, INK);
+    var sw = Math.sin(t * 2.1) * 0.18;   // ひもは 横へ ぴょんと出て、札は 下に たれる(目に かからない)
+    c.save(); c.translate(15, 2); c.rotate(-1.15 + sw);
+    c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(3, 7, 0, 14); stroke(INK, 1.2);
+    c.translate(0, 14); c.rotate(1.15 - rot - sw * 1.6);
+    rr(-10, 0, 20, 12, 2); fs('#fff', 1.5); word('三世', 0, 6.5, 8, INK);
     c.restore();
     c.restore();
   }
@@ -107,10 +109,10 @@ var BOSSART = (function () {
     if (glow) stroke('rgba(255,120,40,.35)', lw * 3);
     stroke(col, lw); c.restore();
   }
-  function smoke(x, y, t, n, s) {
+  function smoke(x, y, t, n, s, rgb) {
     for (var i = 0; i < n; i++) {
       var u = (t * 0.45 + i / n) % 1;
-      circ(x + Math.sin(i * 2.3 + t * 1.3) * 7 * u, y - u * 42 * s, (4 + u * 10) * s); fs('rgba(150,140,160,' + (0.45 * (1 - u)).toFixed(2) + ')');
+      circ(x + Math.sin(i * 2.3 + t * 1.3) * 7 * u, y - u * 42 * s, (4 + u * 10) * s); fs('rgba(' + (rgb || '150,140,160') + ',' + (0.45 * (1 - u)).toFixed(2) + ')');
     }
   }
   function steam(x, y, t, side) { for (var i = 0; i < 3; i++) { var u = (t * 1.2 + i / 3) % 1; circ(x + side * u * 14, y - u * 18, 3 + u * 6); fs('rgba(255,255,255,' + (0.7 * (1 - u)).toFixed(2) + ')'); } }
@@ -441,7 +443,7 @@ var BOSSART = (function () {
       ell(0, GROUND, 110, 12); fs('rgba(0,0,0,.5)');
     }
     var flap = rd ? 0 : Math.sin(t * 1.7) * 0.5;
-    var memG = sil ? '#000' : lin(0, -140, 0, 40, [0, '#4a1a66', 0.6, '#260b36', 1, '#12051c']);
+    var memG = sil ? '#000' : lin(0, -140, 0, 40, [0, '#5e2486', 0.6, '#30104a', 1, '#160624']);
     var WG = [];
     for (var s = -1; s <= 1; s += 2) {
       WG.push(wing(s * 44, -50, 140, 118, s, flap, memG, '#1c0b26', 3));
@@ -466,7 +468,7 @@ var BOSSART = (function () {
     var br = rd ? 0 : Math.sin(t * 1.6);
     c.save(); c.translate(0, 78); c.scale(1 + br * 0.012, 1 - br * 0.012); c.translate(0, -78);
     c.beginPath(); c.moveTo(-82, -46); c.bezierCurveTo(-94, 0, -68, 50, -46, 80); c.lineTo(46, 80); c.bezierCurveTo(68, 50, 94, 0, 82, -46); c.quadraticCurveTo(0, -76, -82, -46); c.closePath();
-    fs(sil ? '#000' : lin(0, -64, 0, 80, [0, '#45246a', 1, '#1a0b2a']), 3);
+    fs(sil ? '#000' : lin(0, -64, 0, 80, [0, '#5c348c', 1, '#200e33']), 3);
     if (!sil) { // うろこ(1回の stroke で まとめて)
       c.beginPath();
       for (var ry = -34; ry <= 64; ry += 11) for (var rx = 0; rx < 3; rx++) for (s = -1; s <= 1; s += 2) {
@@ -490,12 +492,11 @@ var BOSSART = (function () {
       ell(hx, hy, 19, 16); fs(SK[3], 3);
       claws(hx, hy + 8, s, 4, 24, 12, 0.42);
     }
-    if (d > 0.4 && !sil) { smoke(-70, -56, t, 3, 1); smoke(72, -50, t + 0.7, 3, 1); }
     // 首と頭
-    c.save(); c.translate(jx, -90);
+    c.save(); c.translate(jx, -88); c.scale(1.12, 1.12);
     tube([0, 26, 0, 40], 46, SK[3]);
     for (s = -1; s <= 1; s += 2) {
-      horn(s * 22, -18, s * 92, -26, s * 66, -47, 25, '#efe2c4', '#5e4630', 4, 3);  // ねじれた 大ツノ
+      horn(s * 22, -18, s * 92, -26, s * 66, -47, 25, '#f4e8cc', '#a0805a', 4, 3);  // ねじれた 大ツノ
       horn(s * 30, -6, s * 56, -6, s * 62, -16, 10, '#d9c9a6', '#5e4630', 0, 2.2);
       poly([s * 30, 8, s * 60, 18, s * 34, 20]); fs('#2a1240', 2); poly([s * 28, 20, s * 52, 34, s * 26, 30]); fs('#2a1240', 2); // ほおの とげ
     }
@@ -511,12 +512,12 @@ var BOSSART = (function () {
     }
     // 頭(上)
     c.beginPath(); c.moveTo(-36, -14); c.quadraticCurveTo(0, -36, 36, -14); c.quadraticCurveTo(44, 0, 34, 14); c.lineTo(20, 26); c.quadraticCurveTo(0, 30, -20, 26); c.lineTo(-34, 14); c.quadraticCurveTo(-44, 0, -36, -14); c.closePath();
-    fs(sil ? '#000' : lin(0, -30, 0, 28, [0, '#5a3080', 1, '#22102f']), 3);
+    fs(sil ? '#000' : lin(0, -30, 0, 28, [0, '#7040a4', 1, '#2a1240']), 3);
     c.beginPath(); c.moveTo(0, -26); c.lineTo(0, -4); stroke('rgba(160,100,220,.5)', 2);
     // はな先
     c.beginPath(); c.moveTo(-16, 8); c.lineTo(16, 8); c.lineTo(13, 24); c.quadraticCurveTo(0, 28, -13, 24); c.closePath(); fs('#3a1d52', 2.4);
     for (s = -1; s <= 1; s += 2) { ell(s * 6, 19, 3, 2, s * 0.4); fs(sil ? '#000' : 'rgb(' + (chg ? '255,200,80' : '255,90,40') + ')'); }
-    if (!sil && !rd && (chg || pulse > 0.7)) { smoke(-6, 14, t, 2, 0.5); smoke(6, 14, t + 0.5, 2, 0.5); }
+    if (!sil && !rd && chg) { smoke(-6, 14, t, 2, 0.5, '255,200,120'); smoke(6, 14, t + 0.5, 2, 0.5, '255,200,120'); }
     // 目(光る)と まゆの でっぱり
     for (s = -1; s <= 1; s += 2) {
       var ex = s * 17, ey = -4;
@@ -525,8 +526,8 @@ var BOSSART = (function () {
       else if (f.eye === 'swirl') { c.beginPath(); for (var a = 0; a <= 4 * PI; a += 0.4) { var r = 9 * a / (4 * PI); var x = ex + Math.cos(a + t * 9) * r, y = ey + Math.sin(a + t * 9) * r; if (a === 0) c.moveTo(x, y); else c.lineTo(x, y); } stroke(EYE, 2.4); }
       else if (f.eye === 'x') { c.beginPath(); c.moveTo(ex - 7, ey - 6); c.lineTo(ex + 7, ey + 6); c.moveTo(ex + 7, ey - 6); c.lineTo(ex - 7, ey + 6); stroke(EYE, 3); }
       else {
-        c.beginPath(); c.moveTo(ex - s * 11, ey - 1); c.quadraticCurveTo(ex, ey - 9, ex + s * 11, ey + 5); c.quadraticCurveTo(ex, ey + 7, ex - s * 11, ey - 1); c.closePath(); fs(EYE, 2);
-        ell(ex, ey, 4.5, 3); fs('#fff6c8'); ell(ex, ey, 1.6, 4.5); fs(INK);
+        c.beginPath(); c.moveTo(ex - s * 13, ey - 2); c.quadraticCurveTo(ex, ey - 11, ex + s * 13, ey + 5); c.quadraticCurveTo(ex, ey + 8, ex - s * 13, ey - 2); c.closePath(); fs(EYE, 2);
+        ell(ex, ey, 5.5, 3.6); fs('#fff6c8'); ell(ex, ey, 1.8, 5.2); fs(INK);
       }
       poly([s * 36, -16, s * 6, -10, s * 4, -4, s * 34, -6]); fs('#24102f', 2.2);   // おこった まゆ(内がわが 下がる)
       if (f.tears) { c.beginPath(); c.moveTo(ex, ey + 6); c.quadraticCurveTo(ex + s * 4, ey + 16, ex + s * 2, ey + 26); stroke('rgba(120,190,255,.85)', 4); }
@@ -560,44 +561,47 @@ var BOSSART = (function () {
   }
 
   /* ---------- 変身(影) ---------- */
-  function ensureOff() {
-    if (oc) return true;
-    try { off = document.createElement('canvas'); off.width = OFF_W * OFF_S; off.height = OFF_H * OFF_S; oc = off.getContext('2d'); } catch (e) { off = null; oc = null; }
-    return !!oc;
+  function ensureOff() { // 影を描く 下書きの canvas(2 枚。1 枚に 1 つの姿を まっ黒に ぬる)
+    if (OFF.length === 2) return true;
+    try { for (var i = 0; i < 2; i++) { var cv = document.createElement('canvas'); cv.width = OFF_W * OFF_S; cv.height = OFF_H * OFF_S; var g = cv.getContext('2d'); if (!g) throw 0; OFF.push({ cv: cv, g: g }); } } catch (e) { OFF = []; }
+    return OFF.length === 2;
   }
-  function silLayer(list) {
-    oc.setTransform(1, 0, 0, 1, 0, 0); oc.globalCompositeOperation = 'source-over'; oc.globalAlpha = 1; oc.clearRect(0, 0, off.width, off.height);
+  function silLayer(i, ph, o, sx, sy) {
+    var L = OFF[i], cv = L.cv, oc = L.g;
+    oc.setTransform(1, 0, 0, 1, 0, 0); oc.globalCompositeOperation = 'source-over'; oc.globalAlpha = 1; oc.clearRect(0, 0, cv.width, cv.height);
     oc.setTransform(OFF_S, 0, 0, OFF_S, OFF_X * OFF_S, OFF_Y * OFF_S);
     var keep = c; c = oc;
-    for (var i = 0; i < list.length; i++) {
-      var L = list[i]; if (L.a <= 0.01) continue;
-      oc.save(); oc.globalAlpha = L.a; oc.translate(0, GROUND); oc.scale(L.sx, L.sy); oc.translate(0, -GROUND); drawForm(L.ph, L.o); oc.restore();
-    }
+    oc.save(); oc.translate(0, GROUND); oc.scale(sx, sy); oc.translate(0, -GROUND); drawForm(ph, o); oc.restore();
     c = keep;
-    oc.setTransform(1, 0, 0, 1, 0, 0); oc.globalAlpha = 1; oc.globalCompositeOperation = 'source-in';
-    var g = oc.createLinearGradient(0, 0, 0, off.height); g.addColorStop(0, '#2a0d40'); g.addColorStop(1, SILC); oc.fillStyle = g;
-    oc.fillRect(0, 0, off.width, off.height); oc.globalCompositeOperation = 'source-over';
+    oc.setTransform(1, 0, 0, 1, 0, 0); oc.globalCompositeOperation = 'source-in';
+    var g = oc.createLinearGradient(0, 0, 0, cv.height); g.addColorStop(0, '#3a1258'); g.addColorStop(1, '#0a0012'); oc.fillStyle = g;
+    oc.fillRect(0, 0, cv.width, cv.height); oc.globalCompositeOperation = 'source-over';
   }
-  function blitOff(a, glow) {
+  function blitOff(i, a, glow) {
     if (a <= 0.01) return;
-    c.save(); c.globalAlpha *= a; if (glow) { c.shadowColor = glow; c.shadowBlur = 22; }
-    c.drawImage(off, -OFF_X, -OFF_Y, OFF_W, OFF_H); c.restore();
+    c.save(); c.globalAlpha *= a; if (glow) { c.shadowColor = glow; c.shadowBlur = 24; }
+    c.drawImage(OFF[i].cv, -OFF_X, -OFF_Y, OFF_W, OFF_H); c.restore();
   }
   function copyO(o) { var n = {}; for (var k in o) n[k] = o[k]; n.sil = true; n.morph = null; n.hurt = 0; n.atk = 0; return n; }
   function drawMorph(ph, o) {
     var u = o.morph, A = o.from < 0 ? 0 : o.from > 3 ? 3 : o.from, B = ph, oS = copyO(o);
     if (!ensureOff()) { drawForm(u < 0.5 ? A : B, o); return; }
-    if (u < 0.15) { drawForm(A, o); silLayer([{ ph: A, a: 1, sx: 1, sy: 1, o: oS }]); blitOff(sm(u / 0.15), null); return; }
-    if (u < 0.72) {
+    if (u < 0.15) { drawForm(A, o); silLayer(0, A, oS, 1, 1); blitOff(0, sm(u / 0.15), null); return; }
+    if (u < 0.72) { // 黒い影が ぶくぶく ふくらみながら 前の姿 → 新しい姿 へ
       var k = sm((u - 0.15) / 0.57), r = HT[B] / HT[A], wob = o.reduced ? 0 : Math.sin(u * 46) * 0.045 * (1 - Math.abs(2 * k - 1));
       var sa = mix(1, r, k), sb = mix(1 / r, 1, k), pump = o.reduced ? 1 : 1 + 0.05 * Math.sin(u * PI * 7) * (1 - k);
-      silLayer([{ ph: A, a: 1 - k, sx: sa * pump * (1 + wob), sy: sa * pump * (1 - wob), o: oS }, { ph: B, a: k, sx: sb * pump * (1 - wob), sy: sb * pump * (1 + wob), o: oS }]);
-      blitOff(1, 'rgba(190,90,255,.95)');
+      // 2 つの影を 1 枚に まぜてから 出す(重なった所が すけないように)
+      silLayer(0, A, oS, sa * pump * (1 + wob), sa * pump * (1 - wob));
+      silLayer(1, B, oS, sb * pump * (1 - wob), sb * pump * (1 + wob));
+      var g0 = OFF[0].g; g0.setTransform(1, 0, 0, 1, 0, 0);
+      g0.globalCompositeOperation = 'destination-out'; g0.fillStyle = 'rgba(0,0,0,' + (k * k).toFixed(3) + ')'; g0.fillRect(0, 0, OFF[0].cv.width, OFF[0].cv.height);
+      g0.globalCompositeOperation = 'source-over'; g0.globalAlpha = k; g0.drawImage(OFF[1].cv, 0, 0); g0.globalAlpha = 1;
+      blitOff(0, 1, 'rgba(200,100,255,.95)');
       if (!o.reduced) zap(o.t, 0.9);
       return;
     }
     drawForm(B, o);
-    if (u < 0.92) { silLayer([{ ph: B, a: 1, sx: 1, sy: 1, o: oS }]); blitOff(1 - sm((u - 0.72) / 0.2), 'rgba(190,90,255,.6)'); }
+    if (u < 0.92) { silLayer(0, B, oS, 1, 1); blitOff(0, 1 - sm((u - 0.72) / 0.2), 'rgba(200,100,255,.6)'); }
   }
 
   /* ---------- 外から呼ぶ ---------- */

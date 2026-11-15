@@ -691,7 +691,7 @@ var BATTLEUI = (function () {
     var hp = S.view.bossMax ? S.shownBossHp / S.view.bossMax : 1;
     // 足元の炎(段階が上がるほど 大きく 外へ。のんきな 最初の姿には 出さない)
     if (S.spin < 0 && !S.morph && ph >= 1) {
-      var fl = 1 + 0.12 * Math.sin(G.t * 9), fl2 = 1 + 0.12 * Math.cos(G.t * 7), fx = [0, 84, 108, 150][ph], fsz = [0, 40, 50, 58][ph];
+      var fl = 1 + 0.12 * Math.sin(G.t * 9), fl2 = 1 + 0.12 * Math.cos(G.t * 7), fx = [0, 84, 108, 160][ph], fsz = [0, 40, 50, 46][ph];
       ATL.draw('🔥', BOSS_CX - fx, 284, fsz * fl); ATL.draw('🔥', BOSS_CX + fx, 284, fsz * fl2);
     }
     ctx.save(); ctx.translate(BOSS_CX, BOSS_CY + dy); ctx.rotate(rot); ctx.scale(sc, sc); ctx.globalAlpha = alpha;
@@ -713,7 +713,7 @@ var BATTLEUI = (function () {
     // 大技の予告「!!」
     if (S.warnT > 0 || m === 'charge') {
       var t = S.warnT, ws = t > 1.15 ? 1 + (t - 1.15) / 0.25 : 1, on = t > 0 ? (Math.floor(t * 8) % 2 === 0) : (Math.floor(G.t * 3) % 2 === 0);
-      if (on) txt('!!', BOSS_CX, 86, Math.round(64 * ws), '#ff3d3d', 'center', 900, '#fff');
+      if (on) { if (ph >= 3) txt('!!', 80, 118, Math.round(64 * ws), '#ff3d3d', 'center', 900, '#fff'); else txt('!!', BOSS_CX, 86, Math.round(64 * ws), '#ff3d3d', 'center', 900, '#fff'); } // ほんきの姿は 顔が 上にあるので 左上に
     }
   }
   function drawHud() {
